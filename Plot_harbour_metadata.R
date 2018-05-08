@@ -1,7 +1,7 @@
 # Code used to produce metadata maps for Varkey, Mazard et al., "Spatial and temporal shifts in phytoplankton community structure in the Sydney Harbour estuary" submitted to Marine and Freshwater Research 
 #
 # The data used was first reported in Jeffries, T., Schmitz Fontes, M., Harrison, D., Van-Dongen-Vogels, V., Eyre, B., Ralph, P. and Seymour, J. (2016), 'Bacterioplankton dynamics within a large anthropogenically impacted urban estuary', Frontiers in Microbiology, vol 6 .
-# AUthors: Martin Ostrowski and Deepa varkey
+# Authors: Martin Ostrowski and Deepa varkey
 # email: martin.ostrowski@mq.edu.au
 # website: https://github.com/martinostrowski/marinemicrobes
 # May 2018; Last revision: 09-May-2018

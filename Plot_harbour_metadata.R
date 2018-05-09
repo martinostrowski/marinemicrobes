@@ -238,9 +238,3 @@ axis(4, at=c(-33.753, -33.878))
 
 
 
-
-
-proj4string(df3) <- "+init=epsg:4326"
-
-## now burst column "groupID"
-mapview(df3, zcol = "groupID", burst = TRUE

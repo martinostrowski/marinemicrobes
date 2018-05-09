@@ -22,7 +22,7 @@ shapeocean <- readOGR(dsn = "~/Dropbox/Syd_Harbour/OceanEcosystems2002/Data/", l
 my.estuaries<-c("PORT JACKSON HARBOUR","PARRAMATTA RIVER ESTUARY","LANE COVE RIVER ESTUARY","MIDDLE HARBOUR CREEK ESTUARY","PARRAMATTA RIVER FRESHWATER")
 my.estuary.shapes<-shape[shape$NAMETYPE %in% my.estuaries,]
 
-quartz(height=30, width=12) # set window dimensions on OSX
+quartz(height=20, width=12) # set window dimensions on OSX
 
 mycol<-"grey"
 plot(my.estuary.shapes, col=mycol, xlim=c(151,151.3), lwd=0.25, border=NA)

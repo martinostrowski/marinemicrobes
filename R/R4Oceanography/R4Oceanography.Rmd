@@ -1,0 +1,267 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+Authors:Martin Ostrowski, Deepa Varkey
+Version: 20180515
+
+##R4Oceanography
+
+An introduction to R for plotting data on maps.
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+cars is a pre-loaded dataset for demonstration purposes. To see what the dataset looks like execute 'cars' in a chunk
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+```{r}
+cars
+```
+
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
+
+
+
+
+
+***
+#### Introduction to R 
+
+The aims of this practical are to develop core data handling, plotting and mapping skills using a programming lanaguage. R is the language that we will be using today. Other languages, such as ArcGIS, Matlab and Python, are also very capable of achieving the same, or better, results. Oh, by the way, R is **free**. Ultimately the choice of language will be yours. These notes are written in R Markdown format which will allow you to execute the code inline and produce a web friendly (.html) format preview.
+
+
+The objectives of todays practical are to:
+
+*setup*
+
+* install the [latest version of R](https://www.r-project.org) on your own laptop (or one provided to you)
+* install the [latest version of RStudio](https://www.rstudio.com/products/rstudio/download/)
+* Download the data package from [github](https://github.com/martinostrowski/marinemicrobes/tree/master/R) and move it to your Desktop folder
+
+(20-30 min)
+
+*getting started*
+
+* Use R to plot an annotated map of Australia
+- navigating the Rstudio environment
+- loadng and manipulating data
+- understanding basic data types: variables, vectors, dataframes, matrices etc.
+- basic plots
+- maps
+(45 min)
+
+- exercises: practice customising plots
+
+*extending*
+
+* Obtain Satellite Sea Surface Temperataure and Chlorophyll data in the form of netcdf files
+* Use R to plot SST on a map of Australia
+* Use R to plot Chlorophyll concentration on a map
+
+(30 min)
+
+***
+
+#### 1. A guided introduction to R
+
+(10 min)
+
+
+
+#### 2. Live coding, plot an annotated map of Australia
+
+
+To plot data on a map you first need a map to work from. We can find the information by loading two packages, maps, and mapdata. Information in this section was sourced from [Jeff Bowman](http://www.polarmicrobes.org/making-maps-in-r/)
+```{r}
+install.packages('maps')
+install.packages('mapdata')
+library(maps)
+library(mapdata)
+```
+Let's try plotting a map
+
+```{r}
+map()	# low resolution map of the world
+```
+
+let's limit the map region to Australia by addin limits for longitude `x` and latitude `y` using `xlim=c(110,157), ylim=c(-48, -10)`
+
+```{r}
+map('worldHires', xlim=c(110,157), ylim=c(-48, -10), fill=T, col="grey")
+```
+
+```{r}
+map('worldHires', xlim=c(110,180), ylim=c(-48, -10), fill=T, col="grey", asp=1)
+```
+
+Now we can add data points. 
+
+
+##### Ocean Data
+
+Australia operates an [Integrated Marine Observing System](ww.imos.org.ua) which served data from ocean observations through the [Australian Ocean Data Network](www.aodn.org.au)
+
+
+load data from the [Integrated Marine Observing System](ww.imos.org.ua) National Reference Stations. IMOS operates 7 National Reference Stations around the coast of Australia.The coordinates for each station are given in the data file NRSlatlon.csv
+
+Before loading the data we need to make sure that we are in the right directory with the `setwd()` command
+
+```{r}
+setwd("~/Desktop/R4Oceanography/")
+
+nrs.sites<-read.table("NRSlatlong.csv", h=T, sep=",")
+```
+check the data
+
+```{r}
+nrs.sites
+```
+
+
+Now try adding the data to the map using `points()` to add a plotting character `pch=` to an x,y coordinate
+
+```{r}
+map('worldHires', xlim=c(110,180), ylim=c(-48, -10), fill=T, col="grey", asp=1)
+points(nrs.sites$long, nrs.sites$lat)
+```
+These points are hard to see. We can make them bigger using the `cex=` option, and use a different plotting character (`pch=16`)
+```{r}
+map ('worldHires', xlim=c(110,180), ylim=c(-48, -10), fill=T, col="grey", asp=1)
+points (nrs.sites$long, nrs.sites$lat, pch=16, cex=5)
+```
+This looks great.
+
+**Q** how can we tell which site is which? 
+Use `text()` to add text to an x,y position on a map
+
+```{r}
+map ('worldHires', xlim=c(110,180), ylim=c(-48, -10), fill=T, col="grey", asp=1)
+points (nrs.sites$long, nrs.sites$lat, pch=16, cex=5)
+text (nrs.sites$long, nrs.sites$lat, nrs.sites$code, col="white")
+```
+
+##### Next, add the voyage stations from the [RV Investigator voyage 04](https://www.cmar.csiro.au/data/trawler/survey_details.cfm?survey=IN2016_V04) in 2016 
+
+```{r}
+setwd("~/Desktop/R4Oceanography/")
+
+in16.sites<-read.table("IN16latlong.csv", h=T, sep=",")
+```
+
+Check the data
+
+```{r}
+in16.sites
+```
+
+
+**Q:** How many stations are there?
+
+```{r}
+nrow(in16.sites)
+```
+Plot the stations on a map. Hint: change the longitude range. 
+```{r, fig.height=4}
+map ('worldHires', xlim=c(145,160), ylim=c(-42, -20), fill=T, col="grey", asp=1)
+title(xlab = 'Longitude',
+      ylab = 'Latitude')
+box()
+grid()
+points(in16.sites$long, in16.sites$lat, pch=16, col="red")
+```
+
+##### Exercises
+
+a. Try changing the colour of the points using `col=` ("red", "blue", "black")
+b. Try changing the shape of the plotting characters using `pch=` (1-25)
+c. Add the location of the nearset IMOS NRS
+d. Colours are already defined in the column col (in16.sites$col). **Q** Can we use this to color the points?
+
+
+```{r, fig.height=5}
+map ('worldHires', xlim=c(145,160), ylim=c(-42, -20), fill=T, col="grey", asp=1)
+points(in16.sites$long, in16.sites$lat, pch=16, col=in16.sites$col, cex=2)
+```
+
+
+#### 3. Adding satellite data layers
+
+Ocean Data Products specific to Australia are hosted on the AODN website. However, for this practical we will browse data from the [NASA Ocean Color](https://oceancolor.gsfc.nasa.gov/cgi/l3) website, via the level 3 data browser. From the pulldown menus select Terra MODIS 4µ nightime, 4km resolution, 8 day composite. When hovering your mouse over the desired date you will see 3 download options in the bottom left, middle and right corners. Click on te leftee corner to download the .nc file and move it to your R4Oceanography directory on the desktop.
+
+The .nc file extension signifies it is a netcdf file [Network Common Data Form](https://www.unidata.ucar.edu/software/netcdf/). Netcdf4 format is commonly used for high density arrays of data, such as those used in oceanography, climatology, taxonomy and GIS applications.
+
+To enable R to work with netcdf files additional libraries need to be added
+
+```{r}
+install.packages('ncdf4')
+library(ncdf4)
+install.packages('oce')
+library(oce) #A Package for Oceanographic Analysis
+```
+
+What does a netcdf file look like?
+
+```{r}
+sst01<-nc_open("~/Desktop/R4Oceanography/T20162572016264.L3m_8D_SST4_sst4_4km.nc")
+```
+
+```{r}
+sst01
+```
+
+
+
+```{r}
+sst01.d<-ncvar_get(sst01, 'sst4');  ### check the variable name is correct, can be 'sst4', or other names
+sst01.d[sst01.d>42.00072]<-NA  ### beware this value should be changed to NA in the matrix
+sstlon <- ncvar_get(sst01, 'lon')
+sstlat <- ncvar_get(sst01, 'lat')
+```
+An image with a colour pallette can be generated using imagep from the oce package
+
+
+```{r}
+imagep(sstlon, sstlat, sst01.d, col=oceColorsTemperature(255), filledContour=T, missingColor=0, zlab='sst (˚C)', xlim=c(140,165), ylim=c(-46, -25), zlim=c(10,28), asp=1);
+map('worldHires', xlim=c(145,160), ylim=c(-46, -20), fill=T, col="lightgrey", add=T, border=NA)
+title(xlab = 'Longitude',
+      ylab = 'Latitude')
+```
+
+
+Next zoom in on the RV Investigator sites, and plot them on the map. BE patient.
+
+```{r}
+imagep(sstlon, sstlat, sst01.d, col=oceColorsTemperature(255), filledContour=T, missingColor=0, zlab='sst (˚C)', xlim=c(145,160), ylim=c(-46, -25), zlim=c(10,28), asp=1)
+points(in16.sites$long, in16.sites$lat, pch=16, col=in16.sites$col, cex=2)
+map('worldHires', xlim=c(145,160), ylim=c(-46, -20), fill=T, col="lightgrey", add=T, border=NA)
+title(xlab = 'Longitude',
+      ylab = 'Latitude')
+```
+
+##### More exercises
+
+a. find some satellite chlorophyll data, download it read into R and plot
+
+That is it. Well Done!
+
+Save the file. Preview the .html version. Keep this tutorial somewhere safe for future reference.
+
+
+
+#### Where to get help and find useful material
+
+* Attend a local [Software Carpentry course](https://resbaz.github.io/resbaz2018/sydney/) run by Macquarie University 
+* Visit the [Software Carpentry Website](https://software-carpentry.org), find a course or access [online lessons](https://software-carpentry.org/lessons/) 
+* Google
+
+

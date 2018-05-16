@@ -1,0 +1,56 @@
+CTD,type,lat,long,col
+IN16v04.001,Test cast,-34.33,151.76,red
+IN16v04.002,Eddy Transect,-34.17,152.57,red
+IN16v04.003,Eddy Transect,-34.27,152.33,red
+IN16v04.004,Eddy Transect,-34.32,152.06,red
+IN16v04.005,Eddy Transect,-34.4,151.8,red
+IN16v04.008,Process Stn Coastal,-33.39,152.03,red
+IN16v04.009,Process Stn Coastal,-33.39,152.02,red
+IN16v04.010,,-33.01,152.46,blue
+IN16v04.011,Port Hacking,-34.13,151.24,black
+IN16v04.012,Upwelling?,-36.32,150.28,red
+IN16v04.013,Process Stn-  Coastal,-36.25,150.3,red
+IN16v04.014,Process Stn-  Coastal,-36.26,150.29,red
+IN16v04.015,Transect - Southern,-36.23,151.27,red
+IN16v04.016,Transect - Southern,-36.25,151.93,red
+IN16v04.017,Transect - Southern,-36.25,153.26,red
+IN16v04.018,Transect - Southern,-36.25,154.25,red
+IN16v04.019,Transect - Southern,-37,154,red
+IN16v04.020,Not the right water,-37,152.99,red
+IN16v04.021,Process Stn - Tasman,-36.99,153.89,red
+IN16v04.022,Process Stn - Tasman,-36.99,153.89,red
+IN16v04.023,Deep Cast - Tasman,-36.89,152.55,purple
+IN16v04.024,,-36.49,150.29,red
+IN16v04.025,,-34.84,151.34,red
+IN16v04.026,Process Stn - EAC,-30.56,153.67,red
+IN16v04.027,Process Stn - EAC,-30.64,153.62,red
+IN16v04.028,Drift Study - EAC,-30.81,153.44,orange
+IN16v04.029,Drift Study - EAC,-30.97,153.39,orange
+IN16v04.030,Drift Study - EAC,-31.51,153.33,orange
+IN16v04.031,Drift Study - EAC,-31.65,153.32,orange
+IN16v04.031,Drift Study - EAC,-31.64,153.32,orange
+IN16v04.032,Drift Study - EAC,-31.84,153.32,orange
+IN16v04.033,Drift Study - EAC,-31.98,153.3,orange
+IN16v04.034,Process Stn - EAC,-32.46,153.18,red
+IN16v04.035,Process Stn - EAC,-32.48,153.16,red
+IN16v04.035,Process Stn - EAC,-32.47,153.17,red
+IN16v04.036,Drift Study - EAC,-32.57,153.12,orange
+IN16v04.037,Drift Study - EAC,-32.59,153.07,orange
+IN16v04.038,Drift Study - EAC,-32.76,152.99,orange
+IN16v04.039,Drift Study - EAC,-33,152.91,orange
+IN16v04.040,Drift Study - EAC,-33.05,152.88,orange
+IN16v04.041,Process Stn - Tasman,-32.47,154.49,red
+IN16v04.042,Process Stn - Tasman,-32.48,154.48,red
+IN16v04.043,Transect - Middle,-32.47,154.1,red
+IN16v04.044,Transect - Middle,-32.46,153.7,red
+IN16v04.045,Transect - Middle,-32.46,153.4,red
+IN16v04.046,Transect - Middle,-32.29,152.88,red
+IN16v04.047,Process Stn - EAC,-29.15,154.48,red
+IN16v04.048,Process Stn - EAC,-29.16,154.48,red
+IN16v04.049,Transect - Northern,-28,153.78,red
+IN16v04.050,Transect - Northern,-28.02,154.03,red
+IN16v04.051,Transect - Northern,-28.01,154.35,red
+IN16v04.052,Transect - Northern,-28,154.78,red
+IN16v04.053,Transect - Northern,-28,155.03,red
+IN16v04.054,Deep Cast,-27.92,155.15,red
+IN16v04.055,Process Stn - EAC,-28,155.04,red

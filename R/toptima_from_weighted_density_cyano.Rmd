@@ -1,0 +1,182 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Authors: Martin Ostrowski, Deepa Varkey and Mark Brown
+email: martin.ostrowski@mq.edu.au
+Acknowledgements: This workbook likely contains mistakes. Feel free to suggest improvements to the code.
+This workbook processes a selection of public and private data, kindly refrain from sharing it without consent from the contributors. 
+
+If you would like to access to data please register your interest with [Bioplatforms Australia](http://www.bioplatforms.org.au)
+
+
+#####Workbook outlining methods to extract temperature optima and ranges from Australian Microbiome zOTU data
+
+Data is limited to the top 31 cyanobacterial zOTUs based on total abundance in the subsampled dataset
+
+```{r}
+cyano31<-read.table("~/Dropbox/zOTU_Cyano/cyano_top31_w_meta.txt", h=T, sep='\t')
+```
+
+Quick plot to observe the geographical range of sampling
+```{r}
+
+colnames(cyano31)
+plot(cyano31$lon, cyano31$Lat, asp=1)
+
+```
+
+Remove the rows with missing data
+```{r}
+cyano31t<-cyano31[complete.cases(cyano31$temp),]
+
+```
+Plot the temperature density for each zOTU
+
+
+```{r}
+plot(density(cyano31t$temp, weights=(cyano31t[,14]/sum(cyano31t[,14]))), ylim=c(0,0.3), xlim=c(5,34), main="weighted density Thermal Niche top 31 Cyanobacterial zOTUs", xlab="Temperature ˚C")
+
+for (i in 14:44){
+lines(density(cyano31t$temp, weights=(cyano31t[,i]/sum(cyano31t[,i]))), lwd=2, col=as.character(petb.col$col[i-13]))
+}
+```
+
+Describe the shape of the density curves by finding the values for one peak and the peak 1/2 height width to provide min and max values for the temperature range 
+```{r}
+
+density <- vector('list', 31)
+
+for (i in 1:31){
+  
+density[[i]]<-density(cyano31t$temp, weights=(cyano31t[,(i+13)]/sum(cyano31t[,(i+13)])))
+}
+
+peak.temps <- vector('list', 31)
+
+for (i in 1:31){
+peak.temps[[i]]<-density[[i]]$x[which.max(density[[i]]$y)]
+}
+
+min.temps <- vector('list', 31)
+
+for (i in 1:31){
+min.temps[[i]]<-min(density[[i]]$x[which(density[[i]]$y>max(density[[i]]$y)/2)])
+}
+
+max.temps <- vector('list', 31)
+for (i in 1:31){
+max.temps[[i]]<-max(density[[i]]$x[which(density[[i]]$y>max(density[[i]]$y)/2)])
+}
+
+
+
+zotu_trange<-cbind(unlist(min.temps),unlist(peak.temps), unlist(max.temps))
+colnames(zotu_trange)<-c("min", "peak","max")
+row.names(zotu_trange)<-colnames(cyano31t[,14:44])
+
+#write.table(zotu_trange, "~/Dropbox/zOTUs/MM_thermal_optima/Cyano_zOTU_Topt_range.txt", sep='\t', quote=F)
+```
+
+#####Curve fitting and plotting
+
+n.b. the lowess model fit is redundant. All of the data required for the Topt table can be extracted from the density object x and y coordinates.
+
+```{r}
+
+loess.temps <- vector('list', 31)
+for (i in 1:31){
+loess.temps[[i]]<-loess(density[[i]]$y ~ density[[i]]$x)
+}
+```
+
+Plot some examples to show how the density curve envelopes the actual data values
+
+```{r}
+par(mfrow=c(3,2))
+
+plot(density(cyano31t$temp, weights=(cyano31t[,14]/sum(cyano31t[,14]))), ylim=c(0,0.22), xlim=c(5,34), main="weighted density Thermal Niche", xlab="Temperature ˚C")
+
+lines(loess.temps[[1]], lty=4, lwd=4)
+
+points(cyano31t$temp, (cyano31t[,14]/sum(cyano31t[,14])*14), cex=0.4, col=as.character(petb.col$col[1]))
+
+plot(density(cyano31t$temp, weights=(cyano31t[,18]/sum(cyano31t[,18]))), ylim=c(0,0.22), xlim=c(5,34), main="weighted density Thermal Niche", xlab="Temperature ˚C")
+
+lines(loess.temps[[5]], lty=4, lwd=4)
+
+points(cyano31t$temp, (cyano31t[,18]/sum(cyano31t[,18])*12), cex=0.4, col=as.character(petb.col$col[5]))
+
+plot(density(cyano31t$temp, weights=(cyano31t[,22]/sum(cyano31t[,22]))), ylim=c(0,0.22), xlim=c(5,34), main="weighted density Thermal Niche", xlab="Temperature ˚C")
+
+lines(loess.temps[[9]], lty=4, lwd=4)
+
+points(cyano31t$temp, (cyano31t[,22]/sum(cyano31t[,22])*12), cex=0.4, col=as.character(petb.col$col[9]))
+
+plot(density(cyano31t$temp, weights=(cyano31t[,21]/sum(cyano31t[,21]))), ylim=c(0,0.22), xlim=c(5,34), main="weighted density Thermal Niche", xlab="Temperature ˚C")
+
+lines(loess.temps[[8]], lty=4, lwd=4)
+
+points(cyano31t$temp, (cyano31t[,21]/sum(cyano31t[,21])*12), cex=0.4, col=as.character(petb.col$col[8]))
+
+plot(density(cyano31t$temp, weights=(cyano31t[,25]/sum(cyano31t[,25]))), ylim=c(0,0.22), xlim=c(5,34), main="weighted density Thermal Niche", xlab="Temperature ˚C")
+
+lines(loess.temps[[12]], lty=4, lwd=4)
+
+points(cyano31t$temp, (cyano31t[,25]/sum(cyano31t[,25])*12), cex=0.4, col=as.character(petb.col$col[12]))
+
+plot(density(cyano31t$temp, weights=(cyano31t[,42]/sum(cyano31t[,42]))), ylim=c(0,0.22), xlim=c(5,34), main="weighted density Thermal Niche", xlab="Temperature ˚C")
+
+lines(loess.temps[[29]], lty=4, lwd=4)
+
+points(cyano31t$temp, (cyano31t[,42]/sum(cyano31t[,42])*12), cex=0.4, col=as.character(petb.col$col[29]))
+```
+
+
+Plot the density of temperature observations to show the *bias* in sampling
+```{r}
+plot(density(cyano31t$temp))
+```
+
+Plot all data on one plot. The pause was added for dramatic effect in order to show the overlapping distributions.
+
+```{r}
+plot(density(cyano31t$temp, weights=(cyano31t[,14]/sum(cyano31t[,14]))), ylim=c(0,0.3), xlim=c(5,34), main="weighted density Thermal Niche top 31 Cyanobacterial zOTUs", xlab="Temperature ˚C")
+
+for (i in 1:31){
+points(cyano31t$temp, cyano31t[,(i+13)]/sum(cyano31t[,(i+13)])*18, cex=0.4, col=as.character(petb.col$col[i]))
+Sys.sleep(1)
+}
+
+for (i in 14:44){
+lines(density(cyano31t$temp, weights=(cyano31t[,i]/sum(cyano31t[,i]))), lwd=2, col=as.character(petb.col$col[i-13]))
+Sys.sleep(1)
+}
+
+for (i in 1:31){
+lines(loess.temps[[i]], col=as.character(petb.col$col[i]), lty=4, lwd=5)
+}
+
+
+
+```
+
+#### To Do
+
+unrelated code below implementing an uncontrolled gams model
+
+```{r}
+#colnames(cyano31t)
+
+
+mod.full<-gam(cyano31t[,18] ~ temp + nox +sal + sil + po4 + DayLength +Depth +N.P, family=poisson(link="log"), data= cyano31t)
+
+summary(mod.full)
+```
+```{r}
+
+par(mfrow=c(2,4))
+gam::plot.Gam(mod.full, se=T)
+```
+

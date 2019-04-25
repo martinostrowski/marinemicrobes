@@ -24,7 +24,7 @@ This directory contains the backbone of R scripts for preparing a filtered zOTU 
 ### Contact
 
 Martin Ostrowski. Ocean Microbiology Group, C3 Institute, University of Technology, Sydney
-email: [Martin Ostrowski](mailto: martin.ostrowski@uts.edu.au)
+email: [Martin Ostrowski](martin.ostrowski@uts.edu.au)
 
 ### References
 

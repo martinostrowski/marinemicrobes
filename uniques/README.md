@@ -18,10 +18,19 @@ This directory contains the backbone of R scripts for preparing a filtered zOTU 
 - [x] Assign taxonomy against GTDB 16S rRNA databasae
 - [ ] processed tables are available in-house
 
-bac.16s.zotus.site.code.csv
-bac.16s.zotus.site.code.gtdbtax.csv
+Data files
 
-## 
+1. bac.16s.zotus.site.code.csv
+2. bac.16s.zotus.site.code.gtdbtax.csv
+  2. coastal.gtdbtax.csv
+  2. pelagic.gtdbtax.csv
+  2. sediment.gtdbtax.csv
+  2. sponge.gtdbtax.csv
+  2. seaweed.gtdbtax.csv
+  2. coral.gtdbtax.csv
+  2. seagrass.gtdbtax.csv
+
+## Overview
 
 ![zOTU collector curve](images/ami_collector.png)
 
@@ -34,6 +43,6 @@ Martin Ostrowski. Ocean Microbiology Group, C3 Institute, University of Technolo
 email: [Martin Ostrowski](martin.ostrowski@uts.edu.au)
 
 ### References
-
+* [The Australian Microbiome](https://www.australianmicrobiome.com) [Data Portal](https://data.bioplatforms.com/organization/about/australian-microbiome)
 * The Genome Tree Database [GTDB](http://gtdb.ecogenomic.org)
 * The Protist Reference Database 2 [PR2](https://github.com/pr2database/pr2database)

@@ -1,2 +1,2 @@
-This directory contains scripts used for mapping raw readsto datasets, or gene catalogues
+This directory contains scripts used for mapping raw reads to datasets, or gene catalogues
 

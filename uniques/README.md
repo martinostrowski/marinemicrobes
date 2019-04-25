@@ -28,5 +28,5 @@ email: martin.ostrowski@uts.edu.au
 
 ### References
 
-The Genome Tree Database (GTDB)[http://gtdb.ecogenomic.org]
-The Protist Reference Database 2 (PR2)[https://github.com/pr2database/pr2database]
+* The Genome Tree Database (GTDB)[http://gtdb.ecogenomic.org]
+* The Protist Reference Database 2 (PR2)[https://github.com/pr2database/pr2database]

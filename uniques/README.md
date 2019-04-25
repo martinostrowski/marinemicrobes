@@ -18,6 +18,13 @@ This directory contains the backbone of R scripts for preparing a filtered zOTU 
 - [x] Assign taxonomy against GTDB 16S rRNA databasae
 - [ ] processed tables are available in-house
 
+bac.16s.zotus.site.code.csv
+bac.16s.zotus.site.code.gtdbtax.csv
+
+## 
+
+![zOTU collector curve](images/ami_collector.png)
+
 ![non-interactive treemap](images/ami_overview.png)
 
 

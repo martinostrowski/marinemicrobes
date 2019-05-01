@@ -1,5 +1,5 @@
 
-# The Rationale for unfiltered data
+# The rationale for unfiltered data
 
 The rationale for providing an unfiltered dataset follows the observation that some ecologically significant zOTUs (ASVs) were disappearing from the processed table. The cause was identified as the denoising step (carried out with unoise3 within the AMI amplicon processing pipeline). Within the Order Cyanobacteriia, Genus _Synechococcus_, two ecologically significant clades display a single base pair change within the 16S SSU rRNA gene V1-V3 region (27F-~520R), i.e clade II (subclades abc) and clade IV. The denoising process resulted in the merger of clade IV into clade II, thereby affecting the accuracy of abundances for each ASV.
 
@@ -42,11 +42,11 @@ Data files
 Martin Ostrowski. Ocean Microbiology Group, C3 Institute, University of Technology, Sydney
 email: [Martin Ostrowski](martin.ostrowski@uts.edu.au)
 
-Uniques data was processed from [The Australian Microbiome](https://www.australianmicrobiome.com) raw data by [Matt Smith]()[Andrew Bissett]() & [Mark Brown]()
+Uniques data was processed from [The Australian Microbiome](https://www.australianmicrobiome.com) raw data by [Matt Smith](), [Andrew Bissett]() & [Mark Brown]()
 
 ### Acknowlegement
 
-We acknowledge the contribution of the AAMBI Project and Marine Microbes consortium in the generation of data used in this publication. The Marine Microbes project was supported by funding from Bioplatforms Australia through the Australian Government National Collaborative Research Infrastructure Strategy (NCRIS) in partnership with the Australian research community.
+We acknowledge the contribution of the AMMBI Project and Marine Microbes consortium in the generation of data used in this publication. The Marine Microbes project was supported by funding from Bioplatforms Australia through the Australian Government National Collaborative Research Infrastructure Strategy (NCRIS) in partnership with the Australian research community.
 
 ### References
 * [The Australian Microbiome](https://www.australianmicrobiome.com) [Data Portal](https://data.bioplatforms.com/organization/about/australian-microbiome)

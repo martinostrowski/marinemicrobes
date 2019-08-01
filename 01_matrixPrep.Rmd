@@ -1,0 +1,142 @@
+---
+title: "Model Input Wide format from Long format"
+output: html_notebook
+---
+
+##Starting datasets:
+
+16S Bacteria:
+* pelagic.gtdb
+* pelagic.silva2
+* plastids.phytoREF
+
+18S Eukaryotes (PR2)
+* nrs
+* voyage
+* euk.ID #remove after adding IDs to voyage dataset
+
+* a16S Archaea (gtdb and Silva)
+* contextual
+
+
+```{r}
+library(tidyverse)
+library(plyr)
+```
+
+File locations
+setwd('/shared/c3/bio_db/BPA/uniques/latest')
+
+```{r}
+setwd('~/db/uniques/BRT_2019/input')
+list.files()
+
+bact <- read_csv("pelagic.gtdb.taxonomy.norm.named.csv")
+  
+euks.nrs <-read_csv("nrs18S_PR2tax.csv")
+
+euks.voy <- read_csv("voyage18S_PR2tax.csv")
+
+euk.ID <- read_csv('euk_abund_ID.csv')
+  
+#arch <-
+  
+plast <- read_csv("pelagic.plastids.phytoref.tax.csv")
+
+#cyano.clades <-
+```
+Add the up to date contextual data and reformat the headings
+
+```{r}
+contextual <- read_csv("contextual_marine_201907.csv")
+ 
+colnames(contextual) <- gsub(" ", "_", colnames(contextual), fixed = TRUE);
+colnames(contextual) <- gsub("[", "", colnames(contextual), fixed = TRUE);
+colnames(contextual) <- gsub("]", "", colnames(contextual), fixed = TRUE);
+colnames(contextual) <- tolower(colnames(contextual));
+contextual <- contextual  %>% separate (sample_id, c("num", "code"), sep='/');
+#contextual$code<-as.numeric(contextual$code)
+contextual<- contextual %>% separate(date_sampled, c('year','month','day'), sep='-', remove=F);
+contextual$month.abb <-factor(month.abb[as.integer(contextual$month)], levels=c("Jan", "Feb","Mar", "Apr","May",  "Jun", "Jul","Aug","Sep","Oct","Nov", "Dec" ));
+```
+*This additional contextual data file was cleaned and contained additional data # obtain from jen*
+
+```{r}
+contextual.modelling <- read_csv("contextual.modelling.csv")
+
+contextual.modelling$code <- as.character(contextual.modelling$code)
+```
+
+Deepa says we should only use samples from the top 200m for modelling so remove the deep samples from the contextual dataset and use that to select the samples we want in the zOTU data
+
+```{r}
+
+contextual.modelling.sub <- contextual.modelling %>% filter(depth_m < 200)
+contextual.sub <- contextual %>% filter(depth_m < 200)
+
+bact.sub <- bact %>% filter(sample %in% contextual.modelling.sub$code)
+```
+Now split the bacterial into plastids and non-plastids
+
+```{r}
+bact.plast <- bact.sub %>% filter (seq %in% plast$zOTU)
+bact.np <- bact.sub %>% filter (!seq %in% plast$zOTU)
+```
+try to take only the top 10,000 if available
+
+```{r}
+
+bact.np.10000 <- bact.np %>% group_by(ID) %>% summarise(zotu.total = sum(abundNorm)) %>% arrange(desc(zotu.total))
+bact.plast.10000 <- bact.plast %>% group_by(ID) %>% summarise(zotu.total = sum(abundNorm)) %>% arrange(desc(zotu.total))
+
+bact.plast.sub <- bact.plast %>% filter(ID %in% bact.plast.10000$ID)
+bact.np.sub <- bact.np %>% filter(ID %in% bact.np.10000$ID[1:10000])
+
+bact.top10k.plast<-bind_rows(bact.np.sub, bact.plast.sub) 
+bact.top10k.plast <- bact.top10k.plast %>% select(ID, sample, abundNorm)
+colnames(bact.top10k.plast) <- c('code',  'abundNorm', 'ID')
+```
+
+Repeat for eukaryotes and archaea
+
+```{r}
+euks.nrs <- euks.nrs %>% select(zOTU, ID, code, abundNorm)
+                                                            
+euks.voy <- euks.voy %>% select(zOTU, code, abundNorm)
+euks.voy <- euks.voy %>% left_join(euk.ID, 'zOTU')
+euks.voy.id <- euks.voy %>% select(ID, code, abundNorm)
+
+euk.top10k<- bind_rows(euks.voy, euks.nrs)
+euks.10000 <- euk.top10k %>% group_by(ID) %>% summarise(zotu.totals = sum(abundNorm)) %>% arrange(desc(zotu.totals))
+euk.sub <- euk.top10k %>% filter(ID %in% euks.10000$ID[1:10000])
+euk.sub <- euk.sub %>%  select(code, abundNorm,  ID)
+```
+
+##Now combine the dataasets in long format
+
+
+```{r}
+bact.euk.combined<- bind_rows(bact.top10k.plast, euk.sub)
+
+write_csv(bact.euk.combined, '~/progress.bact.euk.combined.csv')
+
+bact.euk.combined<-read_csv( '~/progress.bact.euk.combined.csv')
+```
+Spread the data
+
+```{r}
+
+zotus.spread <-bact.euk.combined %>% 
+ group_by_at(vars(-abundNorm)) %>%  # group by everything other than the value column. 
+ mutate(row_id=1:n()) %>% ungroup() %>%  # build group index
+ spread(key=ID, value=abundNorm, fill=0) %>%    # spread
+ select(-row_id)  # drop the index
+
+require(dplyr)
+
+zotus.spread<-zotus.spread %>% 
+     group_by(code) %>% 
+     summarise_all(funs(sum))
+```
+
+

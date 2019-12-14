@@ -1,0 +1,28 @@
+
+
+
+
+for i in *r.fa; do sed -i 's/.contig/~contig/' $i; done
+
+coverm genome --full-help
+
+
+coverm genome --coupled ../fastq_trimmed/21644.R1.fastq.gz ../fastq_trimmed/21644.R2.fastq.gz --reference YON.bin.77.fa --separator '~'
+
+
+
+
+enrichm annotate --output etest1 --genome_files EAC.bin.9.r.fa --ko --ko_hmm --pfam --tigrfam --ec --threads  10 --suffix .fa --force
+
+
+coverm genome --coupled ../../fastq_trimmed/21644.R1.fastq.gz ../../fastq_trimmed/21644.R2.fastq.gz --reference EAC.bin.9.r.fa --separator '~' -t 12
+
+
+/shared/c3/apps/miniconda3/bin/enrichm annotate --output etest1 --genome_files EAC.bin.9.r.fa --ko --ko_hmm --pfam --tigrfam --ec --threads 10 --suffix .fa --force
+
+
+for i in * fa
+
+do
+/shared/c3/apps/miniconda3/bin/enrichm annotate --output $i.enrichm --genome_files $i --ko --ko_hmm --pfam --tigrfam --ec --threads 10 --suffix .fa --force
+done

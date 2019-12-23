@@ -49,7 +49,7 @@ library(RCurl)
 
 load the contextual metadata
 ```{r}
-if(!file.exists("BC_Liquor_Store_Product_Price_list.csv")){
+if(!file.exists("contextual_marine_201907.csv")){
 
 download.file('https://github.com/martinostrowski/marinemicrobes/blob/master/contextualdata/contextual_marine_201907.csv', 'contextual_marine_201907.csv')}
 

@@ -25,11 +25,11 @@ echo "Job has the following nodes/cores:"
 cat ${PBS_NODEFILE}
 
 
-PARAMETERS=$(awk -v line=${PBS_ARRAY_INDEX} '{if (NR == line) { print $0; };}' the.conf)
+#PARAMETERS=$(awk -v line=${PBS_ARRAY_INDEX} '{if (NR == line) { print $0; };}' the.conf)
 
 date +%F_%T
 
 
 echo "$PBS_ARRAY_INDEX"
 
-Rscript --verbose do-dada2f.r $PARAMETERS > fd.20.out;
+Rscript --verbose do-dada2f.r ${PBS_ARRAY_INDEX} > fd.${PBS_ARRAY_INDEX}.out;

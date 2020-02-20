@@ -17,3 +17,14 @@ By comparing these outputs of these three analyses workflows we should be able t
 
 
 1. 18S Coastal Primary Analysis pipeline
+
+
+
+Expected impacts on Beta Diversity
+
+The relative abundance of particular sequence variants can be an important indicator of the combined status, status defined as the collective physical, chemiscal, biogeochemical and biological drivers, and the history of an ecosystem. 
+
+WHat are all of the sources of sequencing errors? what assumptions are made in combating them
+what are the impacts on betadiversity?
+what does that prevent us from doing?
+When sequence error correction Unsupervised 

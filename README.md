@@ -38,5 +38,26 @@
 ## References
 
 
+## Overview
 
-## 
+![zOTU collector curve](./uniques/images/ami_collector.png)
+
+![non-interactive treemap](./uniques/images/ami_overview.png)
+
+
+### Contact
+
+Martin Ostrowski. Ocean Microbiology Group, C3 Institute, University of Technology, Sydney
+email: [Martin Ostrowski](martin.ostrowski@uts.edu.au)
+
+Uniques data was processed from [The Australian Microbiome](https://www.australianmicrobiome.com) raw data by [Matt Smith](), [Andrew Bissett]() & [Mark Brown]()
+
+### Acknowlegement
+
+We acknowledge the contribution of the AMMBI Project and Marine Microbes consortium in the generation of data used in this publication. The Marine Microbes project was supported by funding from Bioplatforms Australia through the Australian Government National Collaborative Research Infrastructure Strategy (NCRIS) in partnership with the Australian research community.
+
+### References
+* [The Australian Microbiome](https://www.australianmicrobiome.com) [Data Portal](https://data.bioplatforms.com/organization/about/australian-microbiome)
+* The Genome Tree Database [GTDB](http://gtdb.ecogenomic.org)
+* The Protist Reference Database 2 [PR2](https://github.com/pr2database/pr2database)
+

@@ -3,7 +3,7 @@
 1. Raw data download
 2. Amplicon Sequence Pipeline
 3. Assembling sequence variant tables
-4. [Taxonomic assignment using DADA2](marinemicrobes/dada2)
+4. [Taxonomic assignment using DADA2](martinostrowski/marinemicrobes/dada2)
 5. Comparison between methods 
 6. Ecological Statistics
 7. Ordination, visualisation and presentation

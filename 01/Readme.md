@@ -28,5 +28,11 @@
 14. Interactive Maps
 15. Flow cytometry
 
+# Publications
+
+[Sydney Harbour](../R)
+[Data Science 2018](../R)
+[Whale snot microbiomes 2018](../R)
+
 ## References
 

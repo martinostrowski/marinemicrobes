@@ -30,9 +30,10 @@
 
 # Publications
 
-[Sydney Harbour](../R)
-[Data Science 2018](../R)
-[Whale snot microbiomes 2018](../R)
+* [Sydney Harbour](../R)
+* [Data Science 2018](../R)
+* [Whale snot microbiomes 2018](../R)
+* [EAC 2020](../R)
 
 ## References
 

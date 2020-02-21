@@ -1,0 +1,244 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("metagenomeSeq")
+
+library(metagenomeSeq)
+
+browseVignettes("metagenomeSeq")
+```
+
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("Rsubread")
+
+library(Rsubread)
+
+browseVignettes("Rsubread")
+
+```
+
+---
+title: "Mapping Metagenome and metatranscriptome reads to MAGs and genomes"
+output: html_notebook
+---
+
+1. MAGs and taxa-grouped subsets of genomes
+2. AMI metagenomes
+3. ISP Metatranscriptomes
+
+
+```{r}
+library(tidyverse)
+library(Rsubread)
+
+
+```
+
+
+INgredients 
+
+
+
+genome sequence
+prodigal gene predictions
+genome annotations
+
+1. create genes and proteins
+2. create GTF
+3. Seed annotation
+4. Interproscan annotation
+
+anvio
+
+5. pfam
+6. cog
+7. ko
+
+
+```{bash}
+
+for i in *fna; do name=$(basename $i .fna); prodigal -i $i -f gff -p meta -d $name.ffn -a $name.faa -o $name.gff -s $name.genes.txt; done
+
+for i in *fna; do name=$(basename $i .fna); blastp -db ~/data/notabs.subsystems.complex.merged -outfmt 6 -max_target_seqs 5 -num_threads 16 -query $i -out $name.Seed.out;
+
+```
+
+1. Readmapping Genomes with coverm
+
+2. Readmapping contigs with coverm
+
+3. Readmapping Genes
+  with Rsubread
+  with blastn
+  with bwa etc.
+
+
+Rsubread => requires GTF and genome fasta file of contigs
+```{r}
+
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager");
+
+BiocManager::install("Rsubread");
+
+
+library(Rsubread);
+
+
+buildindex(basename="~/CL00001_index",reference="~/CL00001.fna")
+
+ispreads<-list.files(path='~/Dropbox/File requests/ISPMetaG/ISP_filtered/')
+
+genome.list<-list('vector',length(ispreads))
+genome.list[[i]]
+ispreads[1]
+for (i in 17:36){
+  align(nthreads = 4,index="~/CL00001_index",readfile1=paste("~/Dropbox/File requests/ISPMetaG/ISP_filtered/", ispreads[i], sep=""),type="rna",
+output_file=paste("CL00001.",i, ".subread.bam", sep=""),minFragLength=50,maxFragLength=600)
+}
+
+cl00001.fc111<-featureCounts(files=as.vector(list.files(path='~/', pattern='.bam$')),annot.ext="~/CL00001.gtf", isGTFAnnotationFile = T, GTF.featureType = "transcript")
+
+names(cl00001.fc111)
+
+cl00001.fc111$counts
+cl00001.fc111$targets
+cl00001.fc111$annotation
+
+saveRDS(cl00001.fc111, file = '~/Dropbox/CL00001.ISP.RDS')
+```
+
+
+
+```{r}
+eacb9<-read_tsv('~/EACbin9Seed.out', col_names=c("seq", "fig", "pid", "x1", "x2","x3", "x4", "x5", "x6", "x7", "x8", "x9"))
+```
+
+```{r}
+eacb9<- eacb9 %>% left_join(subsys, c('fig'='seq'))
+
+
+
+
+subsys
+eacb9.d<- eacb9[!duplicated(eacb9$seq),]
+
+eacbin9.fc <-readRDS('~/Desktop/eacbin9.isp.subread.counts.RDS')
+
+rownames(eacbin9.fc$counts)
+
+eacb9.d <- eacb9.d %>% separate(seq, c(NA, 'contig'), sep="~", remove=F) 
+eacb9.d <- eacb9.d %>% separate(contig, c('contig', 'gene'), sep="_", remove=T) 
+
+uniqc<- as.data.frame(unique(eacb9.d$contig))
+
+uniqc$cnum <- seq(1,nrow(uniqc), 1)
+
+eacb9.d <- eacb9.d %>%  left_join(uniqc, c('contig'="unique(eacb9.d$contig)"))
+
+
+eacb9.d <- eacb9.d %>% unite(col='seq', c('cnum','gene'), sep='_', remove=F )
+
+count.df<-as.data.frame(eacbin9.fc$counts)
+
+count.df$seq <- row.names(count.df)
+
+count.df <- count.df %>% left_join(eacb9.d, 'seq')
+
+table(count.df$c3)
+
+
+
+first_results_EACbin9Sulfur<-count.df %>% filter(c3 == 'Sulfur Metabolism')
+
+
+write_csv(first_results_EACbin9Sulfur, '~/first_results_EACbin9SulfurISP.csv')
+
+write_csv(count.df, '~/first_results_EACbin9ISP.csv')
+
+ispruns <- read_csv('~/Dropbox/ISPrna/ispruns.txtx.txt', col_names='files') 
+
+
+```
+
+
+```{r}
+
+ispruns$sample<-c(rep('ISP001-PHB', 8), rep('ISP002-COASTAL', 8), rep('TASMAN', 8), rep('ISP002-EAC', 8))
+
+countdf.gather<- count.df %>% gather(key='sample', value='reads', -c(33:53))
+
+countdf.gather <- countdf.gather %>% left_join(ispruns, c('sample'='files'))
+
+
+unique(ispruns$files) %in% countdf.gather$sample
+
+
+colnames(count.df)[1:32]<-ispruns$sample
+
+write_csv(as.data.frame(ispruns), '~/isprunorder.csv')
+
+
+str(countdf.gather)
+
+```
+```{r, fig.height=48, fig.width=20, fig.quartz=T}
+ggplot(countdf.gather %>% filter(!is.na(c4)), aes(x=c1, y=sample.y, fill=reads)) + 
+    geom_tile(stat='identity') + 
+    facet_grid(c3+c4~., scales='free', space='free', labeller = label_wrap_gen(multi_line = T, width=60)) + 
+    coord_flip() + 
+    theme_bw(base_size=8) + 
+    theme(strip.text.y = element_text(angle=0)) + 
+    scale_fill_gradientn(colors=c('white', rev(viridis(1000, option='D')))) + 
+    theme(legend.position = 'bottom', axis.text.x=element_text(angle = 45, hjust = 1), panel.spacing = unit(0.02, "cm"))
+
+
+
+
+```
+
+
+
+
+EACbin91subread.bam
+EACbin92subread.bam
+EACbin93subread.bam
+EACbin94subread.bam
+EACbin95subread.bam
+EACbin96subread.bam
+EACbin97subread.bam
+EACbin98subread.bam
+EACbin99subread.bam
+EACbin910subread.bam
+EACbin911subread.bam
+EACbin912subread.bam
+EACbin913subread.bam
+EACbin914subread.bam
+EACbin915subread.bam
+EACbin916subread.bam
+EACbin917subread.bam
+EACbin918subread.bam
+EACbin919subread.bam
+EACbin920subread.bam
+EACbin921subread.bam
+EACbin922subread.bam
+EACbin923subread.bam
+EACbin924subread.bam
+EACbin925subread.bam
+EACbin926subread.bam
+EACbin927subread.bam
+EACbin928subread.bam
+EACbin929subread.bam
+EACbin930subread.bam
+EACbin931subread.bam
+EACbin932subread.bam

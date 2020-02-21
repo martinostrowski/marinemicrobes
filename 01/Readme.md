@@ -8,7 +8,7 @@
 6. Ecological Statistics
 7. Ordination, visualisation and presentation
 8. Community Thermal Index
-9. [Boosted Regression Tree Modelling](../../BRT)
+9. [Boosted Regression Tree Modelling](../../BRT_2018)
 
 # Metagenome analysis workflow
 

@@ -1,14 +1,14 @@
 # Amplicon Analysis Workflow
 
 1. Raw data download
-2. Amplicon Sequence Pipeline
-3. Assembling sequence variant tables
+2. [Amplicon Sequence Pipeline](../dada2)
+3. [Assembling sequence variant tables](../dada2)
 4. [Taxonomic assignment using DADA2](../dada2)
 5. Comparison between methods 
 6. Ecological Statistics
 7. Ordination, visualisation and presentation
 8. Community Thermal Index
-9. Boosted Regression Tree Modelling
+9. [Boosted Regression Tree Modelling](../../BRT)
 
 # Metagenome analysis workflow
 

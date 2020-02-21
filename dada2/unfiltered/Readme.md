@@ -1,0 +1,345 @@
+---
+title: "Australian Microbiome unfiltered datasets"
+output: html_notebook
+---
+
+
+#### Authors: Martin Ostrowski
+#### Date: 20190418
+#### email: martin.ostrowski@uts.edu.au
+
+
+### 
+
+The rationale for providing an unfiltered dataset follows the observation that some ecologically significant ASVs were disappearing from the processed table. The cause was identified as the denoising step (carried out with unoise3 within the AMI amplicon processing pipeline). Within the Order Cyanobacteriia, Genus Synechococcus, two ecologically significant clades display a single base pair change within the 16S SSU rRNA gene V1-V3 region (27F-~520R), i.e clade II (subclades abc) and clade IV. The denoising process resulted in the merger of clade IV into clade II, thereby affecting the accuracy of abundances for each ASV.
+
+The non-filteredd data was supplied as a single 3 column file (seq, site_plate, abund) for each site_plate combination (~107GB for the NRS data alone).
+
+pre-filtering involved removal of all sequences with < 3 abundance on a sequencing run as well as removal of all sequences containing N. n.b. some sequences displayed N at the terminal base, which could be trimmed and retained with modifications to the 'uniques' pipeline
+
+***
+
+### Processing
+
+1. contatenate all files and remove the header row (grep -v 'seq')
+2. remove N, and zOTU with < 3 sequences in one sequencing run
+
+```{bash}
+awk '$3 !="1" { print }' mm.nonp.3col.txt > mm.nonp.3col.no1.txt
+awk '$3 !="2" { print }' mm.nonp.3col.no1.txt > mm.nonp.3col.no2.txt
+awk '$1 !~ /N/ { print }' mm.nonp.3col.no2.txt > mm.nonp.3col.no2.nn.txt
+cat mm.nonp.3col.no2.nn.txt | grep -v 'seq' > mm.nonp.3col.no2.nnh.txt
+```
+
+
+
+All combined marine 3 column files produce a file that is 143 GB 
+
+removing singletons reduces the file size 7-fold 
+
+Overall, removing ASVs with < 3 occurences on any plate reduces the data from 143 GB to 6.2 GB, or a reduction of 23-fold
+
+    11741249 mm.cat.nh.no2.nn.txt - N's removed
+    11748483 mm.cat.nh.no2.txt - zOTUs with abund 2 removed
+    28473597 mm.cat.nh.no1.txt -  zOTUs with abund 1 removed
+   241019872 mm.cat.nh.txt - all samples concatenated
+    
+    10948816 mm.nonp.3col.no1.txt - zOTUs with N's removed
+     4311957 mm.nonp.3col.no2.nnh.txt - zOTUs with abund 1 removed
+     4313782 mm.nonp.3col.no2.nn.txt - N's removed
+     4317105 mm.nonp.3col.no2.txt  - zOTUs with abund 2 removed
+    79617043 mm.nonp.3col.txt - all non NRS samples concatenated
+  
+
+```{r}
+library(tidyverse)
+library(dada2)
+library(tidyquant)
+library(DT)
+library(dplyr)
+library(oce)
+my.zotus<-read_tsv('~/mm.cat.nh.no2.nn.txt', col_names = c('zOTU', 'site', 'abund'))
+my.zotus.site.code <- my.zotus %>% separate(site, c('code', 'site'), sep='_', remove=T)
+my.zotus.site.code$code <- as.numeric(my.zotus.site.code$code)
+contextual <- read_csv("~/Downloads/AustralianMicrobiome-2019-04-10T184531-csv/contextual.csv")
+```
+
+Metadata naming convention. 
+
+The current download format contains mixed cases and spaces in the column names. Lets fix this with gsub to make it easier for everyone
+
+
+```{r}
+colnames(contextual) <- gsub(" ", "_", colnames(contextual), fixed = TRUE)
+colnames(contextual) <- gsub("[", "", colnames(contextual), fixed = TRUE)
+colnames(contextual) <- gsub("]", "", colnames(contextual), fixed = TRUE)
+colnames(contextual) <- tolower(colnames(contextual))
+```
+
+Process the metadata to check wich samples and date ranges are present
+
+```{r}
+contextual <- contextual  %>% separate (sample_id, c("num", "code"), sep='/')
+contextual$code <- as.numeric(contextual$code)
+contextual <- contextual %>% separate(date_sampled, c('year','month','day'), sep='-', remove=F)
+contextual$month.abb <- factor(month.abb[as.integer(contextual$month)], levels=c("Jan", "Feb","Mar", "Apr","May",  "Jun", "Jul","Aug","Sep","Oct","Nov", "Dec" ))
+```
+
+Make a quick plot to compare the coverage in the metafile versus the concatenated filtered file
+
+nb. there are 46 sequencing runs that have contributed to all of the sequencing in this analysis
+
+```{r}
+ggplot(contextual, 
+       aes(x=month.abb, y=as.factor(contextual$depth_m), col=nrs_location_code_voyage_code))+ 
+  geom_point()+
+  facet_grid(nrs_location_code_voyage_code ~ year,  scales='free_y') + 
+  theme_mo() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+ggplot(contextual, 
+       aes(x=month.abb, y=contextual$sample_site, col=sample_type)) + 
+  geom_point() + 
+  facet_grid(sample_type ~ year, scales='free_y') + 
+  theme_mo() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+ggplot(contextual %>% 
+         filter(code %in% my.zotus.site.code$code), 
+       aes(x=month.abb, y= depth_m)) + 
+  geom_point()+
+  facet_grid(sample_type ~ year) + 
+  theme_mo() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+These suggest that there are no chunks of data missing
+
+```{r}
+ggplot(contextual, aes(x=month.abb, y=contextual$latitude_decimal_degrees, color=sample_type)) + 
+  geom_point(size=3, alpha=0.2, shape=16) + 
+  facet_grid(sample_type ~ year) + theme_mo() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  labs(y ="Latitude (˚N), Sample Type", x="Month Year", key="Sample Type") + 
+  
+  scale_color_manual(values=c("#8c334f",
+"#3edcc8",
+"#cc003c",
+"#517200",
+"#c08aff",
+"#f87221",
+"#723893")) 
+#ggsave(filename = "~/AAMBI_MM_samples_2017.pdf", width=10, height=8)
+```
+#### Sample numbers
+
+```{r}
+datatable(as.data.frame(t(table(contextual$sample_type))))
+```
+***
+
+### Rank abundance for each sample type
+
+The aim of this exercise is to determine if a zOTU abundance threshold can be informed by the shape of the data
+
+Below, consider rank abundance for genus, Family and compare for each sample type.
+
+other important questions
+what proportion of the total data corresponds to the fraction retained after filtering rare zOTUs with 1,3,6, 10, 16, 100 sequences (per plate)?
+
+```{r}
+my.zotus.site.code$code<- as.character(my.zotus.site.code$code)
+contextual$code<-as.character(contextual$code)
+my.zotus.site.code <- my.zotus.site.code %>% 
+  left_join(contextual[,c('code','sample_type')], 'code')
+ra.coastal<- my.zotus.site.code %>% 
+  dplyr::group_by(zOTU, sample_type) %>% 
+  summarise(sequence_number = sum(abund))
+st.tidy.l<- split(ra.coastal, ra.coastal$sample_type)
+```
+Make a rank abundance curve and a zoomed rank abundance curve for each sample type
+
+```{r}
+#plotset<-list('dbl', 7)
+for (i in 1:7){
+st.tidy.l[[i]] <- st.tidy.l[[i]] %>% arrange(desc(sequence_number))
+}
+mystcol<-c("#014fb5","#435a16","#e700a8","#68a500","#7e3be9","#0b5f34","#fb002e")
+```
+
+```{r}
+par(mfrow=c(1,2))
+plot(seq(1,10000,1), st.tidy.l[[1]]$sequence_number[1:10000], col='white', xlab='zOTU number', ylab='sum abundance', main='Rank Abundance by Sample Type')
+for (i in 1:7){
+  
+  lines(seq(1,10000,1), st.tidy.l[[i]]$sequence_number[1:10000], col=mystcol[i], lwd=2)
+  
+}
+legend ('topright', legend=names(st.tidy.l), col=mystcol, lwd=3)
+ 
+plot(seq(1,10000,1), st.tidy.l[[1]]$sequence_number[1:10000], col='white', xlim=c(0,1000), ylim=c(0,20000), xlab='zOTU number', ylab='sum abundance', main='zoomed')
+for (i in 1:7){
+  
+  lines(seq(1,10000,1), st.tidy.l[[i]]$sequence_number[1:10000], col=mystcol[i], lwd=2)
+  
+}
+```
+Rank abundance plots for zOTUs show that each sample type is characterised by similar patterns of zOTU abundance with  ~ 200 zOTUs with very high abundances in the unnormalised data
+
+### What proportion of the data is present in non-rare zOTUs?
+
+what happens when you alter the threshold for dropping the 'rare' ASVs. This following chunk examines the % of sequences remaining  (calculated from the abundance) as compared to the original file which already dropped the rare zOTUs corresponding to abundance 1 and 2. 
+
+
+```{r}
+data.reduction<-matrix(nrow=100, ncol=7)
+for (i in 3:100){
+y<-lapply(st.tidy.l, function(x) {
+    y <- colSums(x[(x$sequence_number > i), 'sequence_number'], na.rm=T)
+    return(as.vector(unlist(y)))
+})
+data.reduction[i,]<-as.vector(unlist(y))
+}
+colnames(data.reduction)<-names(unlist(y))
+plot(x=seq(3,100,1), y=data.reduction[3:100,1]/max(data.reduction[3:100,1]), ylim=c(0.6,1), ylab='% remaining', xlab='Top n zOTUs', col='white')
+for (i in 1:7){
+  
+  lines(x=seq(3,100,1), y=data.reduction[3:100,i]/max(data.reduction[3:100,i]), col=mystcol[i], lwd = 2)
+}
+legend('bottomleft', colnames(data.reduction), col=mystcol, lwd=2, ncol=2)
+```
+Sediment and Coral displayed the greatest proportion of sequences with < 100 reads per plate. Pelagic samples displayed the least, with > 92.5 % retained when the threshold for rare sequences was set at 100. 
+***
+How much of the sequence data is contained in the top 10,100,200,500,3000 zOTUs?
+
+This base-r loop calculates the % of sequence present in the top n zOTU. It processes the tidy data file that already has the zOTUs with only 1 or 2 counts in one plate
+
+```{r}
+nzotus<-seq(1,50000,20)
+topx.zotu.abund<-matrix(nrow=length(nzotus), ncol=7)
+for (i in 1:length(nzotus)){
+y<-lapply(st.tidy.l, function(x) {
+    y <- colSums(x[1:nzotus[i], 'sequence_number'], na.rm=T)
+    return(as.vector(unlist(y)))
+})
+topx.zotu.abund[i,]<-as.vector(unlist(y))
+}
+colnames(topx.zotu.abund)<-names(unlist(y))
+plot(x=nzotus, y=topx.zotu.abund[,1]/max(data.reduction[3:100,1]), ylim=c(0.0,1), ylab='% sequences', xlab='number of zOTUs', col='white')
+for (i in 1:7){
+  lines(x=nzotus, y=topx.zotu.abund[,i]/max(data.reduction[3:100,i]), col=mystcol[i], lwd = 2)
+}
+legend('bottomright', colnames(data.reduction), col=mystcol, lwd=2, ncol=2)
+```
+```{r}
+write_csv(my.zotus.site.code, "~/Dropbox/AMI/zOTU/16S_uniques/bac.16s.zotus.site.code.csv")
+```
+
+***
+
+### Add in the taxonomic classifications
+
+We've used taxonomic classifications from
+1. Silva
+2. a 16S datdabase composed from the gtdbtk metadata (Martin checked that this was up to date
+3. custom cyanobacterial classifications that included an error Pro_HLI -> Pro LLI
+
+
+read - in the gtdbtk taxa (a few files)
+```{r}
+gtdb.taxa.1<-read_csv("~/Dropbox/AMI/zOTU/16S_uniques/taxa.gtdbtk.df.csv.1")
+gtdb.taxa.2<-read_csv("~/Dropbox/AMI/zOTU/16S_uniques/bsub.taxa.1.gtdb.csv.1")
+gtdb.taxa.3<-read_csv("~/Dropbox/AMI/zOTU/16S_uniques/bsub.taxa.2.gtdb.csv.1")
+gtdb.taxa.4<-read_csv("~/Dropbox/AMI/zOTU/16S_uniques/bsub.taxa.3.gtdb.csv.1")
+gtdb.taxa<-rbind(gtdb.taxa.1, gtdb.taxa.2, gtdb.taxa.3, gtdb.taxa.4)
+```
+
+```{r}
+str(gtdb.taxa)
+table(gtdb.taxa$Phylum)
+```
+Join the available taxonomic classification with the table
+```{r}
+my.zotus.site.code.gtdbtax <- my.zotus.site.code %>% left_join(gtdb.taxa, c('zOTU'='seqs')) 
+zotus.st.tax <- split (my.zotus.site.code.gtdbtax, my.zotus.site.code.gtdbtax$sample_type)
+names(zotus.st.tax)
+ami_treemap(my.zotus.site.code.gtdbtax, 4, "Overview: AMI abundance by GTDB Order, Genus") # treemap function will be provided at the end of this script (reference PR2)
+```
+
+
+
+```{r}
+for (i in 1:7){
+  
+  ami_treemap(zotus.st.tax[[i]], 4, names(zotus.st.tax[i]))
+  dev.copy2pdf(file=paste(names(zotus.st.tax[i]), "v2.pdf", sep=""))
+}
+```
+```{r}
+colnames(zotus.st.tax[[2]])
+for (i in 1:7){
+  
+  ami_treemap(zotus.st.tax[[i]][zotus.st.tax[[i]]$Family=='f__Rhodobacteraceae',], 5, names(zotus.st.tax[i]))
+  dev.copy2pdf(file=paste(names(zotus.st.tax[i]), "_Rhodo.pdf", sep=""))
+}
+pr2.env$taxo_levels =c("Kingdom", "Phyllum", "Class",   "Order",   "Family",  "Genus",   "Species")
+zotus.st.tax[[i]][,zotus.st.tax[[i]]$Family=='f__Cyanobiaceae']
+```
+
+###### Interesting things to do with such a dataset
+
+1. what is the core shared between all
+2. what are indicator species
+3. what are top 80%
+4. whata are most informative?
+
+
+```{r}
+toprank<-c(10,50,100,300,1000,5000)
+for (i in seq_along(toprank)){
+  ami_treemap(zotus.st.tax[[1]][1:toprank[i],], 4, names(zotus.st.tax[1]))
+}
+ami_treemap(zotus.st.tax[[1]][zotus.st.tax[[1]]$zOTU %in% core], 4, names(zotus.st.tax[1]))
+names(zotus.st.tax)
+core<-Reduce(intersect, list(zotus.st.tax[[1]]$zOTU, zotus.st.tax[[3]]$zOTU, zotus.st.tax[[6]]$zOTU))
+core.host<-Reduce(intersect, list(zotus.st.tax[[2]]$zOTU, zotus.st.tax[[4]]$zOTU, zotus.st.tax[[5]]$zOTU,  zotus.st.tax[[6]]$zOTU))
+colnames(my.zotus.site.code.gtdbtax)
+length(unique(my.zotus.site.code.gtdbtax$site))
+```
+
+
+```{r}
+ami_treemap<-function(pr2, taxo_rank, sample_type) {
+    # utilised with kind acknowldegement of PR2 and the taxomap team 
+    # Define the levels
+    level1 = pr2.env$taxo_levels[taxo_rank]
+    level2 = pr2.env$taxo_levels[taxo_rank + 2]
+    # Group
+    pr2_class <- pr2 %>% group_by_(level1, level2) %>% summarise(sequence_number = sum(abund))
+    
+    # Do a simple treemap
+    treemap::treemap(pr2_class, index = c(level1, level2), vSize = "sequence_number", 
+                      asp = 1, lowerbound.cex.labels = 0.2, 
+                     palette = mycols200, vColor = level2, format.legend = list(scientific = FALSE, big.mark = " "),fontsize.labels=c(18,12),                # size of labels. Give the size per level of aggregation: size for group, size for subgroup, sub-subgroups...
+                     fontcolor.labels=c("white","orange"),    # Color of labels
+                     fontface.labels=c(2,1),                  # Font of labels: 1,2,3,4 for normal, bold, italic, bold-italic...
+                     bg.labels=c("transparent"),              # Background color of labels
+                     align.labels=list(
+                         c("center", "center"), 
+                         c("left", "top")
+                     ),                                   # Where to place labels in the rectangle?
+                     overlap.labels=1,                      # number between 0 and 1 that determines the tolerance of the overlap between labels. 0 means that labels of lower levels are not printed if higher level labels overlap, 1  means that labels are always printed. In-between values, for instance the default value .5, means that lower level labels are printed if other labels do not overlap with more than .5  times their area size.
+                     inflate.labels=F,                        # If true, labels are bigger when rectangle is bigger.
+                     aspRatio=3,
+                     title=paste(sample_type),
+                     lwds=(0.5)
+                    
+                     
+    )
+}
+names(zotus.st.tax[[6]])
+edit(treemap)
+```

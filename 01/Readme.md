@@ -1,4 +1,4 @@
-# Amplicon Analysis Workflow
+# Amplicon analysis workflow
 
 1. Raw data download
 2. [Amplicon Sequence Pipeline](../dada2)

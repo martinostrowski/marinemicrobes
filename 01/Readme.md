@@ -15,7 +15,7 @@
 10. Assembly
 11. Co-assembly
 12. Binning and bin-refining
-13. Metagenome Assembled Genomes (MAGs)
+13. [Metagenome Assembled Genomes (MAGs)](../mags)
 14. Annotation
 15. Metatranscriptome analyses
 

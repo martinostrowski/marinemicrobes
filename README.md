@@ -38,7 +38,9 @@
 * [Whale snot microbiomes 2018](./R)
 * [EAC 2020](./R)
 
-## References
+## Contributors
+
+Dr Deepa Varkey, Dr Amaranta Focardi, Dr Mark V. Brown, Dr Anna Bramucci, Dr Beth Signal, Dr Tim Kahlke and James O'Brien (PhD Candidate, Expeditioner and Research Associate)
 
 
 ## Overview

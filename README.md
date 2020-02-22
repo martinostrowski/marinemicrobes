@@ -40,7 +40,7 @@
 
 ## Contributors
 
-Dr Deepa Varkey, Dr Amaranta Focardi, Dr Mark V. Brown, Dr Anna Bramucci, Dr Beth Signal, Dr Tim Kahlke and James O'Brien (PhD Candidate, Expeditioner and Research Associate)
+Dr Deepa Varkey, Dr Amaranta Focardi, Dr Mark V. Brown, Dr Anna Bramucci, Dr Beth Signal, Dr Tim Kahlke, Geraldine Sullivan (Informatics officer), and James O'Brien (PhD Candidate, Expeditioner and Research Associate)
 
 
 ## Overview

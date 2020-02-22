@@ -82,7 +82,7 @@ ggplot() +
 
 ggsave('~/AMMBI_MM_samplemap.png', width=7)
 ```
-
+![AMMBI_MM_samplemap](images/AMMBI_MM_samplemap.png)
 
 ```r
 contextual.long$type <-contextual.long$nrs_location_code_voyage_code
@@ -105,3 +105,10 @@ ggplot() +
 
 ggsave('~/Timeline_of_sampling.png', width=10)
 ```
+
+![AMMBI_MM_Timeline](images/Timeline_of_sampling.png)
+
+
+
+### Load Sequence variant abundance tables
+

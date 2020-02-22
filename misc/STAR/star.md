@@ -17,7 +17,7 @@ Load the package libraries
 library(tidyverse)
 library(oce) #
 ```
-1. Load the contextual metadata and streamline some formatting
+1. Load the contextual metadata and streamline some formatting. (This will make things easier later)
 
 ```r
 contextual.long <- read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/contextual_marine_201907.csv')
@@ -32,7 +32,15 @@ contextual.long <- contextual.long  %>%
   separate (sample_id, c("num", "code"), sep='/')
 ```
 
-separate the YYYY-MM-DD format date into year, month and day. Add levels for months so they appear in the correct order and convert some flagged data points in the nutrient data to NAs
+### Taming the factors in the contextual data
+
+Factors help us organise the data by keeping things in the order we prefer and allowing us to subset according to our interests. Some effort here will keep things manageable.
+
+Several factors can be split, for example, by separating the YYYY-MM-DD format date into year, month and day. 
+
+Add levels for the newly created months so they appear in the correct order (otherwise they are ordered alphabetically). 
+
+Convert some flagged data points in the nutrient data to NAs
 
 ```r
 contextual.long <- contextual.long %>%
@@ -48,12 +56,9 @@ contextual.long$silicate_μmol_per_l[contextual.long$silicate_μmol_per_l == -99
 contextual.long<- contextual.long[contextual.long$salinity_ctd_psu > 2,]
 ```
 
-To examine the extent of the data in time and space plot the sites where the the samples have been collected from and a timeline of sample collection
+To examine the extent of the data in time and space plot the sites where the the samples have been collected from and a timeline of sample collection. Some more effort with factors now will help us do things more efficiently later. We'll get to the goos stuff soon.
 
 ```r
-world <- ne_countries(scale = "medium", returnclass = "sf")
-class(world)
-
 contextual.long$nrs_location_code_voyage_code <- factor(contextual.long$nrs_location_code_voyage_code, levels=c("KAI","MAI","PHB","ROT","NSI","YON","DAR","IN2014_E03","ss2012_t07","ss2013_t03","ss2010_v09","IN2015_v03","SS2012_T06","SS2012_v04", "IN2015_C02", "IN2016_v03", "IN2016_v04", "IN2016_t01"))
 
 contextual.long$type <-contextual.long$nrs_location_code_voyage_code
@@ -68,6 +73,12 @@ sitecols<-c("#abdd3a","#b08eff","#2fe879","#f81f79","#00e6cc","#ff6143","#90217f
             "#da40bf","#5eac4b","#a87fff","#394800","#0053b0","#ff6269","#00a39d","#620056","#006a40",
             "#6c1d00","#b38dba","#0f2200","#001919")
 names(sitecols)<-c("KAI","MAI","PHB","ROT","NSI","YON","DAR","IN2014_E03","ss2012_t07","ss2013_t03","ss2010_v09","IN2015_v03","SS2012_T06","SS2012_v04", "IN2015_C02", "IN2016_v03", "IN2016_v04", "IN2016_t01")
+```
+Now, a view of where-from and when all of these samples were collected.
+
+```r
+world <- ne_countries(scale = "medium", returnclass = "sf")
+class(world)
 
 ggplot() +  
   geom_sf(data = world, lwd=0.1) + 
@@ -107,6 +118,8 @@ ggsave('~/Timeline_of_sampling.png', width=10)
 ```
 
 ![AMMBI_MM_Timeline](images/Timeline_of_sampling.png)
+
+That is a lot of samples. How many in total?
 
 
 

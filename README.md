@@ -1,4 +1,4 @@
-
+![your_perspective](./images/your_perspective.png)
 
 # Amplicon analysis workflow
 

@@ -14,7 +14,7 @@
 
 # Metagenome analysis workflow
 
-10. Assembly
+10. [Assembly](./mags)
 11. Co-assembly
 12. Binning and bin-refining
 13. [Metagenome Assembled Genomes (MAGs)](./mags)
@@ -23,7 +23,7 @@
 
 # Additional routines
 
-10. Spatial mapping SST, Chl
+10. [Spatial mapping SST, Chl](./GettingStartedwithSatelliteDara.Rmd)
 11. PAR
 12. Cyano Reference Database
 13. HPC tools

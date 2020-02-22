@@ -30,6 +30,7 @@
 
 # Publications
 
+* [STAR](./misc/star/star.md)
 * [Sydney Harbour](./R)
 * [Data Science 2018](./R)
 * [Whale snot microbiomes 2018](./R)

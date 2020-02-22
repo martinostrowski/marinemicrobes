@@ -51,17 +51,57 @@ contextual.long<- contextual.long[contextual.long$salinity_ctd_psu > 2,]
 To examine the extent of the data in time and space plot the sites where the the samples have been collected from and a timeline of sample collection
 
 ```r
-shape<-readRDS('~/MarineMicrobes Dropbox/uniques/winona/fortified_shoreline_ggplot_models.RDS')
+world <- ne_countries(scale = "medium", returnclass = "sf")
+class(world)
 
- ggplot() +   geom_polygon(data = fortify(shape %>% filter(between(long, 100, 160), between(lat,-60,0))), 
-               aes(x=long, y = lat, group = group), 
-               color =  NA, fill = "grey80") + 
- 
-  geom_count(data=contextual.long %>% 
-  filter (depth_m < 25, between(longitude_decimal_degrees,90,180)), 
-  aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, color=nrs_location_code_voyage_code, alpha=0.8)) +
-  scale_color_manual(values=mycols310, name="Voyage or Location") + 
-  coord_fixed(1.1) + 
-  theme_bw() +
-  labs(y='Latitide (degrees North)', x='Longitude (degress East)')
-  ```
+contextual.long$nrs_location_code_voyage_code <- factor(contextual.long$nrs_location_code_voyage_code, levels=c("KAI","MAI","PHB","ROT","NSI","YON","DAR","IN2014_E03","ss2012_t07","ss2013_t03","ss2010_v09","IN2015_v03","SS2012_T06","SS2012_v04", "IN2015_C02", "IN2016_v03", "IN2016_v04", "IN2016_t01"))
+
+contextual.long$type <-contextual.long$nrs_location_code_voyage_code
+contextual.long$type<-fct_expand(contextual.long$type, "voyage")
+
+contextual.long$type[!contextual.long$type %in% c("KAI","MAI","PHB","ROT","NSI","YON","DAR")]<- "voyage"
+contextual.long$type<-factor(contextual.long$type, levels=c("KAI","MAI","PHB","ROT","NSI","YON","DAR", "voyage"))
+
+sites<- contextual.long[!duplicated(contextual.long$nrs_location_code_voyage_code),]
+
+sitecols<-c("#abdd3a","#b08eff","#2fe879","#f81f79","#00e6cc","#ff6143","#90217f","#c583c9","#007c1a",
+            "#da40bf","#5eac4b","#a87fff","#394800","#0053b0","#ff6269","#00a39d","#620056","#006a40",
+            "#6c1d00","#b38dba","#0f2200","#001919")
+names(sitecols)<-c("KAI","MAI","PHB","ROT","NSI","YON","DAR","IN2014_E03","ss2012_t07","ss2013_t03","ss2010_v09","IN2015_v03","SS2012_T06","SS2012_v04", "IN2015_C02", "IN2016_v03", "IN2016_v04", "IN2016_t01")
+
+ggplot() +  
+  geom_sf(data = world, lwd=0.1) + 
+  coord_sf(xlim = c(100, 180), ylim=c(-48,-5))+ 
+  theme_bw(base_size=8) + 
+  guides(color=guide_legend( ncol=2)) +
+  geom_count(data=contextual.long, aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, color=nrs_location_code_voyage_code), alpha=0.5)+
+  labs(y='Latitide (degrees North)', x='Longitude (degress East)') +
+  scale_color_manual(values=sitecols, name="Voyage or Reference Station")+
+  geom_text_repel(nudge_x = 0.05, data=sites, (aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, label=nrs_location_code_voyage_code, size=9)))+
+   scale_y_continuous(expand=c(0,0), limits=c(-48,-5)) + scale_x_continuous(expand = c(0,0), limits=c(90,180)) 
+
+ggsave('~/AMMBI_MM_samplemap.png', width=7)
+```
+
+
+```r
+contextual.long$type <-contextual.long$nrs_location_code_voyage_code
+contextual.long$type<-fct_expand(contextual.long$type, "voyage")
+
+contextual.long$type[!contextual.long$type %in% c("KAI","MAI","PHB","ROT","NSI","YON","DAR")]<- "voyage"
+contextual.long$type<-factor(contextual.long$type, levels=c("KAI","MAI","PHB","ROT","NSI","YON","DAR", "voyage"))
+
+
+ggplot() +  
+  theme_bw(base_size=8) + 
+  guides(color=guide_legend( ncol=2)) +
+  geom_point(data=contextual.long %>% filter(!is.na(date_sampled), depth_m < 100), 
+             aes(x=date_sampled, y=round(depth_m/20,0)*20, color=nrs_location_code_voyage_code))+
+  labs(y='Depth (m)', x='Date Sampled', title="Timeline of Sampling") +
+  scale_color_manual(values=sitecols, name="Voyage or Reference Station")+
+  facet_grid(type ~ ., scales='free', space='free') +
+  geom_text_repel(nudge_x = 0.1, data=sites, aes(x=date_sampled, y=100, label=nrs_location_code_voyage_code, size=0.5))+
+  theme(strip.text.y = element_text(angle = 0)) + scale_y_reverse()
+
+ggsave('~/Timeline_of_sampling.png', width=10)
+```

@@ -43,7 +43,7 @@
 
 ## Overview
 
-![zOTU collector curve](./uniques/images/ami_collector.png)
+![zOTU collector curve](./images/pelagic18sDiversity.png)
 
 ![non-interactive treemap](./uniques/images/ami_overview.png)
 

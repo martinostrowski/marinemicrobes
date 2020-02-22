@@ -11,13 +11,15 @@ This is an R notebook providing details of the data and code for the analyses pr
 3. Plot alpha and beta-diversity for the National Reference Station Time Series
 4. Time series plots for specific taxonomic ranks
 
+
+***
 Load the package libraries
 
 ```r
 library(tidyverse)
 library(oce) #
 ```
-1. Load the contextual metadata and streamline some formatting. (This will make things easier later)
+### 1. Load the contextual metadata and streamline some formatting. (This will make things easier later)
 
 ```r
 contextual.long <- read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/contextual_marine_201907.csv')
@@ -32,7 +34,7 @@ contextual.long <- contextual.long  %>%
   separate (sample_id, c("num", "code"), sep='/')
 ```
 
-### Taming the factors in the contextual data
+### 2. Taming the factors in the contextual data
 
 Factors help us organise the data by keeping things in the order we prefer and allowing us to subset according to our interests. Some effort here will keep things manageable.
 
@@ -74,7 +76,7 @@ sitecols<-c("#abdd3a","#b08eff","#2fe879","#f81f79","#00e6cc","#ff6143","#90217f
             "#6c1d00","#b38dba","#0f2200","#001919")
 names(sitecols)<-c("KAI","MAI","PHB","ROT","NSI","YON","DAR","IN2014_E03","ss2012_t07","ss2013_t03","ss2010_v09","IN2015_v03","SS2012_T06","SS2012_v04", "IN2015_C02", "IN2016_v03", "IN2016_v04", "IN2016_t01")
 ```
-Now, a view of where-from and when all of these samples were collected.
+### 3. Now, a view of where-from and when all of these samples were collected.
 
 ```r
 world <- ne_countries(scale = "medium", returnclass = "sf")
@@ -123,5 +125,5 @@ That is a lot of samples. How many in total?
 
 
 
-### Load Sequence variant abundance tables
+### 5. Load Sequence variant abundance tables
 

@@ -1,3 +1,8 @@
+:root {
+  --base-font-size: 14px;
+  --theme-color   : purple;
+}
+
 # Amplicon analysis workflow
 
 1. Raw data download

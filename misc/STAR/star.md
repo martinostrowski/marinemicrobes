@@ -123,7 +123,49 @@ ggsave('~/Timeline_of_sampling.png', width=10)
 
 That is a lot of samples. How many in total?
 
+### 5. How does the physical and chemical conditions differ between sites and vary over time?
 
 
-### 5. Load Sequence variant abundance tables
+To expore the data in different dimensions we can begin by plotting the relationships between nutrients, temperature, depth and time of year.
+
+
+
+```r
+
+ggplot(contextual.long %>% filter(depth_m < 100)) + 
+  geom_point(aes(x=jitter(depth_m), y =Temp_C, color=nrs_location_code_voyage_code, size=nitrate_nitrite_μmol_per_l/phosphate_μmol_per_l), alpha=0.5) +
+  scale_color_manual(values=sitecols, name="NRS or voyage") +
+  theme_bw() + 
+  guides(color=guide_legend( ncol=2, override.aes = list(size=7))) + 
+  coord_flip() + 
+  scale_x_reverse() +
+  labs(x= 'Depth (m)',y='Temp (˚C)', title="N:P ratios depicted in a bubble plot")
+```
+![AMMBI_MM_Timeline](images/Timeline_of_sampling.png)
+
+```r
+ggplot(contextual.long %>% filter(depth_m < 100)) + 
+  geom_point(aes(x=nitrate_nitrite_μmol_per_l, y =Temp_C, color=nrs_location_code_voyage_code, size=phosphate_μmol_per_l), alpha=0.5) +
+  scale_color_manual(values=sitecols, name="NRS or voyage") +
+  theme_bw() + 
+  guides(color=guide_legend( ncol=2, override.aes = list(size=7))) + 
+  coord_flip() + 
+  labs(x= 'NO3+NO2', y='Temp (˚C)', title="Nitrate + Nitrite concentrations v. Temp (˚C)")
+```
+
+![AMMBI_MM_Timeline](images/Timeline_of_sampling.png)
+
+```r
+ggplot(contextual.long %>% 
+         filter (!is.na(Temp_C), type!="voyage"),
+         aes(x=date_sampled, color=depth_m, y=Temp_C)) + 
+          facet_grid (type ~ ., scales='free') + 
+          theme_bw() + 
+          labs(x="Date Sampled", y="Temperature Range (˚C)") +
+          geom_jitter(alpha=0.7, position=position_jitter(w=0.4,h=0.2)) + 
+          scale_color_gradientn(colors=oceColorsDensity(100)) +
+          theme(strip.text.y = element_text(angle = 0))
+```
+
+### 6. Load Sequence variant abundance tables
 

@@ -1,0 +1,227 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+###Getting Started with Stellite Data: SST and Chlorophyll in the EAC
+
+
+
+```{r}
+library(tidyverse)
+
+install.packages('ncdf4')
+library(ncdf4)
+library(viridisLite)
+library(ggrepel)
+library(oce)
+```
+
+
+Get startaed by plotting a map and your sample points or stations of interest. Substitute your data - this will help set the geographical and temporal limits of your plot, (and help reduce the amount of data processing and plotting in later steps)
+```{r}
+
+my.data <-nc_open("/Volumes/LaCie/chl/A20021822019212.L3m_MC_CHL_chlor_a_4km.nc")
+
+
+
+shape<-readRDS('~/MarineMicrobes Dropbox/uniques/winona/fortified_shoreline_ggplot_models.RDS')
+
+ggplot() +   geom_polygon(data = fortify(shape %>% filter(between(long, 130, 160), between(lat,-46,-10))), 
+               aes(x=long, y = lat, group = group), 
+               color =  NA, fill = "grey80") +
+  theme_bw() +
+  geom_point(data=meta, (aes(x=Longitude, y=Latitude, color=Temperature, alpha=0.2, size=0.2))) + 
+  scale_color_gradientn(colors=oceColorsTemperature(50), name="Temperature (deg C)") + coord_fixed(1.1) + labs(y='Latitide (degrees North)', x='Longitude (degress East)') + geom_text_repel(nudge_x = 0.5, data=meta, (aes(x=Longitude, y=Latitude, label=Station))) + theme_classic(base_size=12) + theme_bw(base_size=12)  + coord_map(projection = 'gilbert', xlim = c(140,158), ylim=c(-42,-22))
+
+```
+
+***
+
+Satellite SST can be sourced from various locations; [ocean color](https://oceancolor.gsfc.nasa.gov), [AODN](), [GHRSST](https://www.ghrsst.org/ghrsst-data-services/services/) to name a few.
+
+The file used in this workflow is an eight day composite (i.e avaeraged over 8 days)  sourced from [ocean color](https://oceancolor.gsfc.nasa.gov). N.B. the netCDF formats from each provider are slightly different (including the name of the sst data!). '~/Dropbox/voyages/IN16_v04/' is the path to the folder where I saved the file downloaded from Oceancolor
+
+```{r}
+sst01<-nc_open("~/Dropbox/voyages/IN16_v04/V20162892016296.L3m_8D_SNPP_NSST_sst_4km.nc");
+```
+
+
+Check the contents of the netCDF
+
+```{r}
+sst01
+
+```
+The questions below will help guide your exploration of nc files.
+
+what dimensions does the sst data display?
+WHat is the range of SST data? Notice anything odd?
+Why are lat and long kept as separate vectors?
+
+
+```{r}
+
+chl08.m<-ncvar_get(my.data, 'chlor_a');  ### check the variable name is correct, can be other names
+min(chl08.m, na.rm=T)
+image(chl08.m)
+
+
+#sst01.d[sst01.d>42.00072]<-NA  ### beware this value should be changed to NA in the matrix
+Chllon <- ncvar_get(my.data, 'lon')
+Chllat <- ncvar_get(my.data, 'lat')
+
+
+?imagep
+
+{imagep(Chllon, Chllat, chl08.m, col=oceColorsChlorophyll(255), zlab='Chl', xlim=c(145,156), ylim=c(-42, -26), zlim=c(0,0.8), asp=1);
+map('worldHires', xlim=c(145,160), ylim=c(-46, -20), fill=T, col="lightgrey", add=T, lwd=0.5, border=NA)}
+
+```
+
+Tip 1. Satellite images and data matrices are often large. Subset to the lat-lon range you need ASAP, and save your work before proceeding!
+
+one trick here to bring tidyverse and ggplot to bear is to convert the wide format SST to long format. Converting the SSt values is easy (as.vector(sstmatrix)), however you will need to create the long version of the Latitude and Longitude to match the pattern followed when the matrix was converted to a vector, i.e. rows by column, or column by rows.
+
+So, what does the data in the matrix look like? (This could take a while)
+
+Try this
+
+```{r}
+image(sst01.d)
+```
+this gives you a clue as to the orientation. How about the lat and lon vectors? These are separate components from the matrix. Can you explain why the silhouette of the continents is upside down?
+
+```{r}
+sstlat #what orientation is this in?
+
+sstlon #and this?
+
+```
+
+```{r}
+
+
+longitude<- rep(sstlon, length(sstlat))
+
+#this might take a while
+latitude  <- rep(sstlat[1], length(sstlon))
+
+for (i in 2:length(sstlat)){
+  latitude <-c(latitude , rep(sstlat[i],length(sstlon)))
+}
+
+SSTlong<-as.data.frame(cbind(latitude, longitude, as.vector(sst01.d)))
+
+names(SSTlong) <-c('lat', 'lon', 'sst')
+
+
+
+```
+
+```{r, fig.height=8,fig.retina=T}
+ggplot() +   geom_polygon(data = fortify(shape %>% filter(between(long, 130, 160), between(lat,-46,-10))), 
+               aes(x=long, y = lat, group = group), 
+               color =  NA, fill = "grey80") +
+  theme_bw() + 
+  geom_raster(data=fortify(SSTlong %>% filter(between(lon, 140, 160), between(lat,-46,-22))) , aes(x=lon, y=lat, fill=sst), interpolate = T) +
+  geom_point(data=meta, (aes(x=Longitude, y=Latitude, color=NOx/Phosphate, alpha=0.2))) + scale_size_manual(values = 0.8) +
+  scale_color_gradientn(colors=oceColors9A(50), name="N:P") + 
+  scale_fill_gradientn(colors=oceColorsTemperature(50), name="Temperature (deg C)") +
+  coord_fixed(1.1) + 
+  labs(y='Latitide (degrees North)', x='Longitude (degress East)') + 
+  geom_text_repel(nudge_x = 0.5, data=meta, (aes(x=Longitude, y=Latitude, label=Station))) + 
+  theme_classic(base_size=10) 
+```
+
+***
+
+Chl data is also from [ocean color](https://oceancolor.gsfc.nasa.gov) but many different sources and different uv-products are available.
+
+
+```{r}
+chl01<-nc_open("~/Dropbox/IN16_v04/V20162892016296.L3m_8D_SNPP_CHL_chlor_a_4km.nc");
+#chl01
+
+chl01.d<-ncvar_get(chl01, 'chlor_a');  ### check the variable name is correct, can be 'sst4', or other names
+#sst01.d[sst01.d>42.00072]<-NA  ### beware this value should be changed to NA in the matrix
+lon <- ncvar_get(chl01, 'lon')
+lat <- ncvar_get(chl01, 'lat')
+
+```
+
+Below is the old method of plotting with base R. See if you can locate the sources of the data you need.
+
+
+*** No progress below the line
+
+```{r}
+
+pdf(file="~/IN16_v04_chl.z.pdf", height=10, width=6)
+imagep(lon, lat, chl01.d, col=oceColorsChlorophyll(255), filledContour=T, missingColor=0, zlab='Chl', xlim=c(145,156), ylim=c(-42, -26), zlim=c(0,0.8));
+map('worldHires', xlim=c(145,160), ylim=c(-46, -20), fill=T, col="lightgrey", add=T, lwd=0.5, border=NA)
+grid()
+title(xlab = 'Longitude',
+      ylab = 'Latitude')
+```
+
+```{r}
+
+
+### Adding current vectors
+
+######Start with currents
+
+```{r}
+### get currents from AODN Gridded Sea level anomaly, download unsubsetted data, one file per time period
+### thanks to Xavier.Hoenner@utas.edu.au for the backbone and fix the current arroe plot.
+curr<-nc_open("~/Dropbox/IN16_v04/IMOS_OceanCurrent_HV_20161019T000000Z_GSLA_FV02_NRT00_C-20161024T012458Z.nc");
+lon <- ncvar_get(curr, 'LONGITUDE')
+lat <- ncvar_get(curr, 'LATITUDE')
+vcur <- ncvar_get(curr, 'VCUR')
+ucur <- ncvar_get(curr, 'UCUR')
+
+
+
+## Transform lon and lat objects so that they have the same length as udata and vdata
+long <- rep(lon, length(lat))
+lati <- NA
+for (i in 1:length(lat)){
+latitude <- rep(lat[i], length(lon))
+if (i == 1) lati <- latitude else lati <- c(lati, latitude)
+}
+lon_b <- lon; lon <- long
+lat_b <- lat; lat <- lati
+
+vdata<-vcur[,]  #northward geostrophic velocity
+udata<-ucur[,]  #eastward geostrophic velocity
+dat1 <- list( )
+dat1$x <- c( lon)
+dat1$y <- c( lat)
+
+x1 <- c( lon) + c( udata)/3 # Divide u values by 5 to resize the length of the current directional arrow
+y1 <- c( lat) + c( vdata)/3 # Divide v values by 5 to resize the length of the current directional arrow
+
+
+```
+
+```{r}
+#####set your lat and lon ranges here 
+xrange <- c(146,157)
+yrange <- c (-38,-28)
+
+
+###check to see if vector size is suitable
+
+plot(1,type="n",xlim = xrange, ylim = yrange, asp=1)
+arrows( dat1$x, dat1$y, x1, y1,length = 0.05, lwd=0.5)
+
+```
+### add the coastline
+```{r}
+plot(1,type="n",xlim = xrange, ylim=c(-40, -28), asp=1)
+arrows( dat1$x, dat1$y, x1, y1,length = 0.05, lwd=0.25, ylim=c(-40, -28))
+map('worldHires', xlim=c(146,157), ylim=c(-40, -28), fill=T, col="grey", add=T)
+
+
+```

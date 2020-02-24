@@ -1,0 +1,303 @@
+---
+title: "BPA_dada2_SOP"
+date: "28/01/2020"
+output:
+  html_document: default
+  pdf_document: default
+authors: Anna R Bramucci, Martin Ostrowski
+---
+
+1. Contruct the Bacterial 16S ASV table from a selection of plate-wise Dada2 pipeline-derived tables. Selection was based on the run that provided the best recovery of total sequences. A limited amount of benchmarking (comparing total unique sequences and total number of reads in each sample and number of samples with < 20,000 reads will be determined).
+
+
+QC 1. comparison between the top 500 SVs from zOTU, ASV and unique datasets
+
+Anna Bramucci and Martin O, downloading the Bacterial 16S processed data (Unoise) dataset from Australian Microbiome website 20 Feb 2020.
+
+     Australian Microbiome OTU Database - tabular export
+---------------------------------------------------
+----------------|---------------
+Amplicon filter | amplicon is '27f519r_bacteria'
+Taxonomy filter | (no taxonomy filter applied)
+Contextual filter | environment is 'Marine'
+Australian Microbiome Database Metadata | Dataset methodology=v1
+   | Dataset revision date=2018-11-24
+  -----------------------------
+
+
+
+Australian Microbiome sequencing plate codes and number of samples at each site in each plate.
+
+The following code sorts and extract the top n SVs
+
+
+```{r, fig.height=8, width=8 }
+
+library(tidyverse)
+library(DT)
+
+Unoise16S<-read_csv('~/db/Martin Ostrowski/benchmarking/AustralianMicrobiome-2020-02-20T072705-csv/Bacteria.csv')
+
+Unoise16S <- Unoise16S %>% separate(`Sample ID`, c(NA, 'code'), sep='/', remove=T)
+
+unoiseTotals<- Unoise16S %>% 
+  group_by(code) %>% 
+  summarise(unoiseT=sum(`OTU Count`))
+
+datatable(unoiseTotals)
+
+nrow(unoiseTotals %>% filter(unoiseT > 20000))/nrow(unoiseTotals) # what percentage of samples have fewer than 20,000 sequences
+
+unoiseSeqRank<- Unoise16S %>% 
+  group_by(OTU) %>% 
+  summarise(unoiseT=sum(`OTU Count`))
+
+unoiseSeqRank<- unoiseSeqRank %>% arrange(desc(unoiseT))
+
+write_csv( as.data.frame(unoiseSeqRank[1:20,]), 'unoiseTop20.csv')
+```
+
+#create a fasta for tagCleaning the primers
+
+```{r}
+unoiseSeqs<- Unoise16S %>% distinct(OTU) 
+
+unoiseSeqs$num <- seq(1,nrow(unoiseSeqs),1)
+
+unoiseSeqs <- unoiseSeqs[,c(2,1)]
+
+write_csv(unoiseSeqs, 'unoiseSeqs.csv')
+```
+
+
+
+## Import the ASV tables
+
+There are two complete runs (prior to pseudo -pooling, or pooling)
+
+
+```{r}
+setwd('~/db/Martin Ostrowski/benchmarking/pelagic16S/')
+
+
+asvtables16S<-list.files(pattern='ASV.')
+
+svs.list<-list('vector', length(asvtables16S))
+
+asvs16S.list <- lapply( asvtables16S, function(x) read_csv(x))
+
+#head(asvs16S.list[])
+
+mysums<-lapply(asvs16S.list, function(x) sum(colSums(x[,-1])))
+mysums<-unlist(mysums)
+namesv1<- as.data.frame(asvtables16S)
+namesv1 <- namesv1 %>% separate(asvtables16S, c(NA, 'plate', NA, NA), c(4,9, 15))
+names(mysums)<- namesv1$plate
+
+
+```
+
+Gather, Bind, Summarise and write tables
+```{r}
+
+asvs16S.gather<-list('vector', length(asvtables16S))
+
+for (i in seq_along(asvs16S.list)){
+  
+  asvs16S.gather[[i]]<- asvs16S.list[[i]] %>% gather(key='code', value='abund', -'X1')
+
+}
+
+pelagicB<-bind_rows(asvs16S.gather[1:28])
+
+pelagicB<- pelagicB %>% filter(abund !=0)
+
+write_csv(pelagicB,'pelagicBDADA2.csv')
+
+pelagicB.ASV<- pelagicB %>% group_by(X1) %>% summarise(total=sum(abund)) %>% arrange(desc(total))
+
+dada16SSeqRank<-  pelagicB %>% 
+  group_by(X1) %>% 
+  summarise(dadaT=sum(abund))
+
+dada16SSeqRank<- dada16SSeqRank %>% arrange(desc(dadaT))
+
+write_csv( as.data.frame(dada16SSeqRank[1:300,]), 'dadaTop300.csv') 
+
+
+pelagicB300<-pelagicB %>% filter(X1 %in% dada16SSeqRank$X1[1:30])
+
+Unoise16S300<-Unoise16S %>% filter(OTU %in% unoiseSeqRank$OTU[1:30])
+
+pelagicB300d<- pelagicB300 %>% left_join(Unoise16S300, c('X1'='OTU'))
+
+
+ggplot(pelagicB300d) %>% geom_point(aes(x=`OTU_count`, y=count))
+
+
+test.ASV <- dada16SSeqRank[1:1000,]
+test.zOTU <-unoiseSeqRank[1:1000,]
+  
+test.ASV <- test.ASV %>% left_join(test.zOTU, c('X1'='OTU'))
+
+test.ASV[is.na(test.ASV)]<-0
+test.ASV[is.na(test.ASV)]<-0
+```
+
+And the 2nd run where the filterandtrim parameters wer modified for the low-yielding plates.
+
+We compared the total number of sequences on each plate from each DaDA2 run. on all comparisons our initial analysis run produced higher numbers of total sequences.
+
+
+```{r}
+ggplot(test.ASV) + geom_point(aes(x=unoiseT, y=dadaT)) +theme_bw() + scale_y_log10() + scale_x_log10()
+
+subset<-test.ASV %>% filter(unoiseT==0)
+
+```
+
+```{r}
+contextual.long <- read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/contextual_marine_201907.csv')
+
+colnames(contextual.long) <- gsub(" ", "_", colnames(contextual.long), fixed = TRUE) #remove spaces
+colnames(contextual.long) <- gsub("[", "", colnames(contextual.long), fixed = TRUE) #remove brackets
+colnames(contextual.long) <- gsub("]", "", colnames(contextual.long), fixed = TRUE)
+colnames(contextual.long) <- gsub("/", "_per_", colnames(contextual.long), fixed = TRUE)
+colnames(contextual.long) <- tolower(colnames(contextual.long)) #all lowercase
+
+colnames(contextual.long)[colnames(contextual.long)=="temperature_ctd_its-90,_deg_c"]<-'Temp_C'
+
+contextual.long <- contextual.long  %>%
+  separate (sample_id, c("num", "code"), sep='/')
+
+contextual.long <- contextual.long %>%
+  separate(date_sampled, c('year','month','day'), sep='-', remove=F) # separate the YYYY-MM-DD format date into year, moth and day
+
+contextual.long$month.abb <- factor(month.abb[as.integer(contextual.long$month)], levels=c(month.abb[seq(1,12,1)])) # add levels from jan to dec
+
+contextual.long$nitrate_nitrite_μmol_per_l[contextual.long$nitrate_nitrite_μmol_per_l == -999.000] <- NA;
+contextual.long$phosphate_μmol_per_l[contextual.long$phosphate_μmol_per_l == -999.000] <- NA;
+contextual.long$salinity_ctd_psu[contextual.long$salinity_ctd_psu == -999.000] <- NA;
+contextual.long$silicate_μmol_per_l[contextual.long$silicate_μmol_per_l == -999.0000] <- NA;
+contextual.long<- contextual.long[contextual.long$salinity_ctd_psu > 2,]
+```
+
+
+
+```{r}
+pelagicB<-pelagicB %>% filter(X1 %in% pelagicB.ASV$X1[1:10000])
+
+contextual.sub<-contextual.long  %>% filter(nrs_location_code_voyage_code %in% c("KAI","MAI","PHB","ROT","NSI","YON","DAR"))
+
+pelagicsub <-pelagicB %>% filter(code %in% contextual.sub$code)
+
+pelagicB <- pelagicB %>% left_join(contextual.long, 'code')
+```
+
+
+
+
+```{r}
+pelagicB$fuB<- ifelse(pelagicB$X1 %in%subset$X1, 'Dada2-Only','Both')
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+class(world)
+
+contextual.long$nrs_location_code_voyage_code <- factor(contextual.long$nrs_location_code_voyage_code, levels=c("KAI","MAI","PHB","ROT","NSI","YON","DAR","IN2014_E03","ss2012_t07","ss2013_t03","ss2010_v09","IN2015_v03","SS2012_T06","SS2012_v04", "IN2015_C02", "IN2016_v03", "IN2016_v04", "IN2016_t01"))
+
+contextual.long$type <-contextual.long$nrs_location_code_voyage_code
+contextual.long$type<-fct_expand(contextual.long$type, "voyage")
+
+contextual.long$type[!contextual.long$type %in% c("KAI","MAI","PHB","ROT","NSI","YON","DAR")]<- "voyage"
+contextual.long$type<-factor(contextual.long$type, levels=c("KAI","MAI","PHB","ROT","NSI","YON","DAR", "voyage"))
+
+sites<- contextual.long[!duplicated(contextual.long$nrs_location_code_voyage_code),]
+
+sitecols<-c("#abdd3a","#b08eff","#2fe879","#f81f79","#00e6cc","#ff6143","#90217f","#c583c9","#007c1a",
+            "#da40bf","#5eac4b","#a87fff","#394800","#0053b0","#ff6269","#00a39d","#620056","#006a40",
+            "#6c1d00","#b38dba","#0f2200","#001919")
+names(sitecols)<-c("KAI","MAI","PHB","ROT","NSI","YON","DAR","IN2014_E03","ss2012_t07","ss2013_t03","ss2010_v09","IN2015_v03","SS2012_T06","SS2012_v04", "IN2015_C02", "IN2016_v03", "IN2016_v04", "IN2016_t01")
+
+ggplot() +  
+  geom_sf(data = world, lwd=0.1) + 
+  coord_sf(xlim = c(100, 180), ylim=c(-48,-5))+ 
+  theme_bw(base_size=8) + 
+  guides(color=guide_legend( ncol=2, override.aes = list(size=7))) +
+  geom_count(data=contextual.long, aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, color=nrs_location_code_voyage_code), alpha=0.5)+
+  labs(y='Latitide', x='Longitude') +
+  scale_color_manual(values=sitecols, name="Voyage or Reference Station")+
+  geom_text_repel(nudge_x = 0.05, data=sites, (aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, label=nrs_location_code_voyage_code, size=9)))+
+  scale_y_continuous(expand=c(0,0), limits=c(-48,-5)) + scale_x_continuous(expand = c(0,0), limits=c(90,180)) 
+
+```
+
+
+```{r}
+ggplot() + geom_bar(data=pelagicB %>%  filter(depth_m==0), aes(x=nrs_location_code_voyage_code, y= abund, fill=fuB), stat='identity', position='fill')  + theme_bw()   +coord_flip()
+
+```
+
+
+```{r}
+rankabund<- pelagicB %>% group_by(X1, fuB) %>% summarise(total=sum(abund))
+
+rankabund <- rankabund %>% arrange(desc(total))
+
+rankabund$X1 <- factor (rankabund$X1, levels=unique(rankabund$X1))
+
+ggplot(rankabund[1:100,]) + geom_bar(aes(x=X1, y=total, fill=fuB), stat='identity') + coord_flip()  +theme_bw() +theme(axis.text.y = element_blank())
+  
+```
+
+setwd('~/db/Martin Ostrowski/benchmarking/pelagic16S/run2')
+asvtablesV216S<-list.files(pattern='ASV.')
+svsV2.list<-list('vector', length(asvtablesV216S))
+namesv2<- as.data.frame(asvtablesV216S)
+namesv2 <- namesv2 %>% separate(asvtablesV216S, c(NA, 'plate', NA, NA), c(4,9, 15))
+asvsV216S.list <- lapply( asvtablesV216S, function(x) read_csv(x))
+names(asvsV216S.list[])<- namesv2$plate
+head(asvsV216S.list[])
+mysumsv2<-lapply(asvsV216S.list, function(x) sum(colSums(x[,-1])))
+mysumsv2<-unlist(mysumsv2)
+namesv2<- as.data.frame(asvtablesV216S)
+namesv2 <- namesv2 %>% separate(asvtablesV216S, c(NA, 'plate', NA, NA), c(4,9, 15))
+names(mysumsv2)<- namesv2$plate
+namesv2
+bind_rows(mysums, mysumsv2)
+
+asvsV216S.gather<-list('vector', length(asvtables16S))
+for (i in seq_along(asvsV216S.list)){
+  asvsV216S.gather[[i]]<- asvsV216S.list[[i]] %>% gather(key='code', value='abund', -'X1')
+}
+
+pelagicV2B<-bind_rows(asvsV216S.gather[], .id = "column_label")
+pelagicV2B<- pelagicV2B %>% filter(abund !=0)
+write_csv(pelagicV2B,'pelagicV2BDADA2.csv')
+pelagicV2B.ASV<- pelagicV2B %>% group_by(X1) %>% summarise(total=sum(abund)) %>% arrange(desc(total))
+dada16SSeqRank<-  pelagicV2B %>% 
+  group_by(X1) %>% 
+  summarise(dadaV2T=sum(abund))
+dadaV216SSeqRank<- dadaV216SSeqRank %>% arrange(desc(dadaV2T))
+write_csv( as.data.frame(dadaV216SSeqRank[1:300,]), 'dadaV2Top300.csv') 
+
+
+
+
+
+
+
+
+unoiseSeqRank<- unoiseSeqRank %>% arrange(desc(unoiseT))
+
+
+
+write_csv( as.data.frame(unoiseSeqRank[1:20,]), 'unoiseTop20.csv')
+
+
+
+
+coastal.plastes<- coastalE %>% group_by(code) %>% summarise(total=sum(abund)) %>% arrange(desc(total))
+
+summary(coastal.plastes$total)
+```
+

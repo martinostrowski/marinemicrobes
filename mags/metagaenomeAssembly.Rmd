@@ -1,0 +1,201 @@
+---
+title: "R Notebook Metagenome Processing"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+***
+
+use TRimmomatic defaults to trim and check for adapters while preserving paired reads
+nb: 4 output files
+
+```{bash}
+java -jar ~/Trimmomatic-0-2.36/trimmomatic-0.36.jar PE MAI20130807d0.R1.fq.gz MAI20130807d0.R2.fq.gz MAI20130807d0.fp.fq.gz MAI20130807d0.fu.fq.gz MAI20130807d0.rp.fq.gz MAI20130807d0.ru.fq.gz ILLUMINACLIP:/Users/mostrowski/Downloads/Trimmomatic-0-2.36/adapters/NexteraPE-PE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36;
+```
+add a name prefix to all sequences, e.g. Maybe doesn't need to be done at this step but it would be easier to parse results from the mapping against the reference set of genes, and it can be used for the miTAG approach of TARA oceans.
+
+```{bash}
+cat IN2015_v03.022.cmaxm.ip.fq | awk 'NR % 4 == 1 {sub(/^@/,"@IN2015_v03.022.cmaxm;")} {print}' | gzip -c > IN2015_v03.022.cmaxm.ipr.fq.gz;
+cat IN2015_v03.022.cmaxm.fu.fq | awk 'NR % 4 == 1 {sub(/^@/,"@IN2015_v03.022.cmaxm;")} {print}' | gzip -c > IN2015_v03.022.cmaxm.fur.fq.gz;
+cat IN2015_v03.022.cmaxm.ru.fq | awk 'NR % 4 == 1 {sub(/^@/,"@IN2015_v03.022.cmaxm;")} {print}' | gzip -c > IN2015_v03.022.cmaxm.rur.fq.gz;
+```
+*not used. interleave paired ends, anticipating making it easier for some assemblers.
+```{bash}
+##python ~/bin/interleave_fastq.py ss2010_v09.031.0m_101.fpr.fq ss2010_v09.031.0m_101.rpr.fq > ss2010_v09.031.0m_101.ipr.fq; 
+```
+run megahit assembler on each sample, ask for min contig length of 500
+
+
+#/usr/bin/python /usr/local/bin/spades.py
+
+```{bash}
+~/megahit/megahit --min-contig-len 500 --12 ss2010_v09.064.32m_207.ipr.fq -r ss2010_v09.064.32m_207.fur.fq,ss2010_v09.064.32m_207.rur.fq -o ss2010_v09.064.32m_207
+```
+predict genes on > 500 bp contigs using Metagenemrak
+
+```{bash}
+~/MetaGeneMark_linux_64/mgm/gmhmmp -a -d -f G -m ~/MetaGeneMark_linux_64/mgm/MetaGeneMark_v1.mod ss2010_v09.031.0m_101/final.contigs.fa.500.fasta -o ss2010_v09.031.0m_101/ss2010_v09.031.0m_101.gff -D ss2010_v09.031.0m_101/ss2010_v09.031.0m_101.orfs.nt;
+```
+
+
+for loop to generate a shell script metagenemark prediction of orfs
+
+```{bash}
+for i in *contigs.fa
+do
+name=$(basename $i .final.contigs.fa)
+echo "/usr/local/bioinf/MetaGeneMark_linux_64/mgm/gmhmmp -a -d -f G -m /usr/local/bioinf/MetaGeneMark_linux_64/mgm/MetaGeneMark_v1.mod $name.final.contigs.fa -D $name.contigs.fa.orfs.nt -A $name.contigs.fa.orfs.aa;"
+done > do-mgm.sh
+
+chmod a+x do-mgm.sh
+
+./do-mgm.sh
+```
+
+cluster all predicted orfs to generate a reference set of genes sequences
+```{bash}
+cd-hit-est -c 0.95 -T 12 -M 0 -G 0 -aS 0.9 -g 1 -r 1 -d 0 -i ss2010.v09.orfs.nt -o ss2010.v09.orfs_
+#cd-hit-para.pl -c 0.95 -T 16 -M 0 -G 0 -aS 0.9 -g 1 -r 1 -d 0 --P cd-hit-est --S 32 ***** --Q 8 --T SGE##cluster all predicted orfs to generate a reference set of genes sequences
+```
+
+rename all genes in the clusetered dataset
+
+```{bash}
+perl -ane 'if(/^\>gene_\d+/){$a++;print ">PHB.NSI.2017_$a\n"}else{print;}' test.fa
+
+## check gene names are unique
+
+cat ss201X_orfs_2017_v2 | grep '>' | cut -f 1 -d '|' | sort | uniq -c
+```
+Map raw sequences back to generate an abundance profile (). Do env stats on this and worry about annotation later.   
+
+First split the fasta of the fasta_forward_read.fa files into parts. On sheldon we will use qsub to submit all jobs to 17 slave nodes
+
+```{bash}
+
+~/bin/fasta-splitter.pl --n-parts 100 indigo.final.contigs.500.orfs_2016.fna
+```
+
+below is a shell script for readmapping against the Reference Gene Catalgue using blastn
+
+key parameters to change are 
+
+1. .conf file (a list of all fasta input files)
+2. db file (make sure you have created the index with makeblastdb)
+2. number of jobs in array (-t 1-200) can be determined by counting number of lines in .conf file (wc -l)
+3. working directory
+4. resource requirements e.g. (-l nodes=1:ppn=6:slave)
+
+```{shell.script}
+#!/bin/bash
+#PBS -N IN16 array
+#PBS -S /bin/bash
+#PBS -t 1-200
+#PBS -l nodes=1:ppn=6:slave
+#PBS -l walltime=2200:00:00
+#PBS -M martin.ostrowski@mq.edu.au
+#PBS -m b
+#PBS -d /disks/sheldon/data/freads
+#PBS -e /home/martino/${PBS_JOBID}.err
+#PBS -o /home/martino/${PBS_JOBID}.out
+
+
+cd ${PBS_O_WORKDIR}
+echo "Job ID is ${PBS_JOBID}"
+echo "Job Array ID is ${PBS_ARRAYID}"
+echo "Timestamp is $(date +%F_%T)"
+echo "Directory is $(pwd)"
+echo "Running on host $(hostname)"
+echo "Working directory is ${PBS_O_WORKDIR}"
+echo "Job has the following nodes/cores:"
+cat ${PBS_NODEFILE}
+
+PARAMETERS=$(awk -v line=${PBS_ARRAYID} '{if (NR == line) { print $0; };}' ${PBS_O_WORKDIR}/in16.conf)
+
+date +%F_%T
+echo "file working on is $PARAMETERS"
+/usr/local/bin/blastn -db /home/martino/IN16.viral.contigs.nt -outfmt='6 qseqid sseqid pident length mismatch gapopen qlen qstart qend sstart send evalue bitscore' -max_target_seqs  1 -best_hit_overhang 0.1 -ungapped -dust no  -num_threads=6 -query $PARAMETERS -out $PARAMETER$
+date +%F_%T
+
+```
+
+send the job to the PBS queue using qsub
+
+```{bash}
+qsub read.mapping.sh
+```
+
+check the status of jobs using wwtop, qstat, and read the output of ~/xxx.OU and ~/xxx.ER
+
+when all jobs have run there is some additional filtering.  Even though Blast is formatted for single target sequence sometimes it returns multiple best hits. To filter out mutiple tophits per query we can use a bash one-liner for all .out files in the directory. Then concatenate all .out.u files before additional filtering (align length and % id). If the concatenated output file is not too large it is possible to process in R but more likely it will need to be converted to a table using a python sscript (2c2tabt.py)
+
+```{bash}
+for i in *genes.out; do sort -u -t$'\t' -k1,1 $i > $i.u; done
+
+cat *.u > contatenateted.all.samples.out.u
+
+##split the query column into two (sample;read) => sample'\t'read
+
+sed -i 's/;//' contatenateted.all.samples.out.u
+
+##when you are satisfiedd with the Blast results filtering cut out the two columns needed to make an abundance table
+
+cat contatenateted.all.samples.out.u | cut -f 1,3 > My.results.2C
+```
+This creates a 2 column file fto feed into the counter (remember to change the name of the input file)
+
+
+```{bash}
+python 2c2tabt.py > My.results.table
+```
+
+```{python}
+# 2c2tabt.py
+from collections import Counter
+with open("IN16.viral.contigs.out.2C") as f:
+    #next(f)  # do this to skip the first row of the file
+    c = Counter(tuple(row.split()) for row in f if not row.isspace())
+
+sites = sorted(set(x[0] for x in c))
+genes = sorted(set(x[1] for x in c))
+
+print 'genes\t', '\t'.join(sites)
+for gen in genes:
+    print gen,'\t', '\t'.join(str(c[site, gen]) for site in sites
+)
+```
+
+The output is now ready to import into R. However, a few pre-flight checks are recommended
+
+
+```{bash}
+
+wc -l # how many rows (subjects)
+head -n 1 # check the sample names (column headers)
+
+```
+
+
+```{r}
+reads.map.table<-read.table("My.results.table", h=T, sep='\t', quote='\"', row.names=1)
+
+head(reads.map.table)
+
+sum(reads.map.table)
+
+rowSums(reads.map.table)
+
+```
+
+
+Next steps
+
+
+
+
+
+
+
+
+

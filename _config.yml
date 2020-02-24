@@ -1,1 +1,7 @@
-theme: jekyll-theme-slate
+
+theme: jekyll-theme-minimal
+
+:root {
+  --base-font-size: 10px;
+  --theme-color   : purple;
+}

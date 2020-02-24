@@ -1,0 +1,242 @@
+---
+title: "*A short guide to time series analyses of microbial data*"
+output: html_notebook
+---
+
+### A short guide to time series analyses of microbial data collected from the Inetegrated Marine Observing System National Reference Stations
+
+#### Author: Martin Ostrowski
+#### Contact: martin.ostrowski@uts.edu.au
+
+Components: 
+1. Amplicon data, 
+2. Contextual data, 
+3. R Notebooks in R Markdown format from the github repository [marineMaicrobes](https://github.com/martinostrowski/marinemicrobes/)
+
+If you need help or would like to report a bug please join us on our [slack channel](https://livingoceanworkspace.slack.com/)
+
+
+
+Acknowledgements: *We would like to acknowledge the contribution of the Marine Microbes consortium in the generation of data used in this example. The Marine Microbes project was supported by funding from Bioplatforms Australia and the Integrated Marine Observing System (IMOS) through the Australian Government National Collaborative Research Infrastructure Strategy (NCRIS) in partnership with the Australian research community.*
+
+For marine samples collected prior to 2015:
+*We would like to acknowledge the contribution of the Australian Marine Microbial Biodiversity Initiative (AMMBI) in the generation of the data used in this publication. AMMBI was funded by Australian Research Council awards DP0988002 to Brown & Fuhrman, DP120102764 to Seymour, Brown & Bodrossy, DP150102326 to Brown, Ostrowski, Fuhrman & Bodrossy, the Environmental Genomics Project from CSIRO Oceans and Atmosphere and a CSIRO OCE Science Leader Fellowship to Bodrossy. AMMBI was also supported by funding the Integrated Marine Observing System (IMOS) through the Australian Government National Collaborative Research Infrastructure Strategy (NCRIS) in partnership with the Australian research community.*
+
+Please refer to the policies regarding data release, communications and acknowledgement on the [Australia Microbiome Initiative website]
+([)https://www.australianmicrobiome.com). Data is freely available, please use it and the many layers of high-quality associated contextual data. Consider that the scientists that collected and processed the data are an additional rich source of contextual information. 
+
+The following R notebooks contain R code for routine ecological procedures , e.g. 
+to visualise the spatial and temporal extent of sampling (maps, plots)
+To summarise the diversity and abundance of the sampled communities (ecological statistics)
+to identify significant differences in microbial communities in time and space (e.g. simprof)
+To identify the species that contribute to significant differencesbetween ecological types (simper, mvabund, etc.)
+
+***
+
+#### Section 1. 
+
+This section locates and loads the metadata and plots the extent of sampled sites in
+
+
+```{r}
+library(tidyverse)
+library(vegan)
+library(clustsig)
+library(mvabund)
+library(RCurl)
+
+```
+
+load the contextual metadata
+```{r}
+if(!file.exists("contextual_marine_201907.csv")){
+
+download.file('https://github.com/martinostrowski/marinemicrobes/blob/master/contextualdata/contextual_marine_201907.csv', 'contextual_marine_201907.csv')}
+
+contextual.long <- read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/contextual_marine_201907.csv')
+  
+
+
+colnames(contextual.long) <- gsub(" ", "_", colnames(contextual.long), fixed = TRUE) #remove spaces
+colnames(contextual.long) <- gsub("[", "", colnames(contextual.long), fixed = TRUE) #remove brackets
+colnames(contextual.long) <- gsub("]", "", colnames(contextual.long), fixed = TRUE)
+colnames(contextual.long) <- gsub("/", "_per_", colnames(contextual.long), fixed = TRUE) #Winona says we should get rid of the slashes as well
+colnames(contextual.long) <- tolower(colnames(contextual.long)) #all lowercase
+
+contextual.long <- contextual.long  %>%
+  separate (sample_id, c("num", "code"), sep='/')
+
+contextual.long <- contextual.long %>%
+  separate(date_sampled, c('year','month','day'), sep='-', remove=F) # separate the YYYY-MM-DD format date into year, moth and day
+
+contextual.long$month.abb <- factor(month.abb[as.integer(contextual.long$month)], levels=month.abb[1:12]) # add levels from jan to dec
+
+contextual.long$nitrate_nitrite_μmol_per_l[contextual.long$nitrate_nitrite_μmol_per_l == -999.000]<-0.001;
+contextual.long$phosphate_μmol_per_l[contextual.long$phosphate_μmol_per_l == -999.000]<-0.001;
+contextual.long$salinity_ctd_psu[contextual.long$salinity_ctd_psu == -999.000]<-0.001;
+  contextual.long$silicate_μmol_per_l[contextual.long$silicate_μmol_per_l == -999.0000]<-0.001;
+contextual.long<- contextual.long[contextual.long$salinity_ctd_psu > 2,]
+```
+
+
+
+Next is a basic routine to plot a map centred on australia with opportunities to layer data
+
+
+```{r}
+setwd('~')
+
+if(!file.exists("fortified_shoreline_ggplot_models.RDS")){
+
+download.file('https://github.com/martinostrowski/marinemicrobes/blob/master/contextualdata/fortified_shoreline_ggplot_models.RDS?raw=true', 'fortified_shoreline_ggplot_models.RDS', method='wget')}
+
+
+shape<-readRDS(file='fortified_shoreline_ggplot_models.RDS' )
+
+ggplot() +   geom_polygon(data = fortify(shape %>% filter(between(long, 100, 160), between(lat,-60,0))), 
+               aes(x=long, y = lat, group = group), 
+               color =  NA, fill = "grey80") + 
+  theme_bw() +
+  geom_count(data=diatoms %>% filter (depth < 25, between(longitude_decimal_degrees,90,180)), aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, color=nrs_location_code_voyage_code, alpha=1)) + scale_color_manual(values=mycols95, name="Voyage or Location") + coord_fixed(1.1) + labs(y='Latitide (degrees North)', x='Longitude (degress East)')
+
+
+cols_31<-c("#d5687e","#9f2942","#dd6766","#cc453d","#822b18","#bb6c44","#c6662f","#dd9b61","#d28826","#cc9d48","#7e651f","#c8aa34","#9ca03c","#b0b162","#a6bc3a","#7cb041","#538336","#5cb455","#58c07b","#43c8ac","#3ba7e5","#6383d1","#7b81eb","#5657bb","#553584","#b582cf","#ca73d4","#ae3d95","#d77bb7","#83295d","#cf4c84")
+```
+
+next import clusters and the bacterial data frame
+
+```{r}
+
+clusters.df <- clusters.df %>%  separate(rowname, c('num', 'code'), sep='/', remove=T)
+
+contextual.long<- contextual.long %>% left_join(clusters.df, 'code')
+```
+
+
+```{r}
+#silva<-read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/Pelagic_Public.csv')
+
+silva.named<-read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/pelagic.silva2.taxonomy.norm.named.csv')
+
+#pelagic<- silva %>% group_by(zOTU, code) %>% summarise(sum=sum(abund))
+#cyano.sub <- cyano %>% select(zOTU, day, `month`,  year, latitude_decimal_degrees, longitude_decimal_degrees, `temperature_ctd_its-90,_deg_c`, nrs_location_code_voyage_code, depth_m, date_sampled, Family, Genus, Species)
+
+```
+Load the latest phylogenetically refined taxonomy for the AMI dataset
+
+```{r}
+
+
+arb<-read_csv('~/MarineMicrobes Dropbox/Martin Ostrowski/bact.star/cyano.pelagic.assignTax.draft3.csv')
+
+silva.named <- silva.named %>% left_join(arb, c('seq'='zOTU'))
+
+table(silva.named$tax.Family)
+
+cyanobact<- silva.named %>% filter(tax.Family %in% c('Cyanobiaceae', 'Cyanobacteriaceae', 'Chloroplast'))
+```
+
+Load the latest input file for bacterial 16S with lineages assigned to zOTUs against the Silva database (Silva 133)
+
+Join the zOTU clade and sub clade assignments on the basis of exact sequence matching
+ 
+! this should also be checked using the dada2 assignSpecies, and assignTaxonomy functions
+
+```{r, fig.width=10}
+
+contextual.long$code <- as.numeric(contextual.long$code)
+cyanobact.cont<- cyanobact %>%  left_join(contextual.long, c('sample'='code'))
+
+silva.named.cont <- silva.named %>% group_by(sample, tax.Phylum, tax.Class, tax.Order) %>% summarise(Order.sums = sum(count))
+silva.named.cont <- silva.named %>%  left_join(contextual.long, c('sample'='code'))
+
+#silva.named.cont$depth_fac<- factor(silva.named.cont$depth_m, levels=rev(c(0, 10, 20, 25,30,40,50,75, 100)))
+#silva.named.cont$nrs_location_code_voyage_code <- factor(silva.named.cont$nrs_location_code_voyage_code, levels= rev(c('MAI', 'KAI','PHB', 'ROT','NSI', 'YON',   'DAR')))
+
+unique(silva.named.cont$nrs_location_code_voyage_code)
+```
+From Here we will concentrate on either the NRS, or the IN2016 voyage plus the east coast nrs
+
+
+```{r}
+library(vegan)
+
+in16v03<- silva.named.cont %>% filter(nrs_location_code_voyage_code == 'IN2016_v03')
+
+
+
+```
+
+
+```{r}
+petb.col<-read.table("~/MarineMicrobes Dropbox/Martin Ostrowski/Refined_provinces/petb2018/petb_col_codes2.txt", h=T, sep='\t')
+jcols<-as.character(petb.col$col)
+names(jcols)<-petb.col$clade
+
+
+names(jcols)[52]<-'IVa'
+unique(in16v03$tax.subclade)
+
+jcols<-c(jcols, "#A8007C")
+names(jcols)[99]<-'HL'
+
+unique(cyanobact.cont$tax.subclade)
+in16v03$tax.subclade[in16v03$tax.subclade=='Iie']<- 'IIe'
+in16v03$tax.subclade[in16v03$tax.subclade=='Iih']<- 'IIh'
+in16v03$tax.subclade[in16v03$tax.subclade=='Iiabc']<- 'II'
+in16v03$tax.subclade[in16v03$tax.subclade=='IV']<- 'IVa'
+in16v03$tax.subclade[in16v03$tax.subclade=='HL']<- 'LLII-III'
+in16v03$tax.subclade[in16v03$tax.subclade=='VIa']<- 'VI'
+in16v03$tax.subclade[in16v03$tax.subclade=='VI']<- 'VIa'
+in16v03$tax.subclade[in16v03$tax.subclade=='LLII']<- 'LLII-III'
+in16v03$tax.subclade[in16v03$tax.subclade=='LLIII']<- 'LLII-III'
+
+#cyanobact.cont$depth_fac<- factor(cyanobact.cont$depth_m, levels=rev(c(0, 10, 20, 25,30,40,50,75,100)))
+#cyanobact.cont$nrs_location_code_voyage_code <- factor(cyanobact.cont$nrs_location_code_voyage_code, levels= rev(c('MAI', 'KAI','PHB', 'ROT','NSI', 'YON',   'DAR')))
+pros<- c('HLII', 'LLI', 'LLII-III', 'LLIV', 'HLI')
+syns <- !unique(cyanobact.cont$tax.Clade) %in% pros
+cyanobact.cont$tax.subclade <- factor(cyanobact.cont$tax.subclade, levels=rev(c("Ia", "IVa", 'IIh','IIe', 'II','IIIa', 'VI', 'EnvC', 'HLII', 'LLI', 'LLII-III', 'LLIV', 'HLI')))
+
+
+in16v03<- cyanobact.cont %>% filter(nrs_location_code_voyage_code == 'IN2016_v03')
+
+
+refineCyanoTax<-cyanobact.cont %>%  group_by(tax.Strain,  tax.subclade, seq) %>% summarise(tally = sum(count)) 
+```
+
+```{r}
+ggplot() + geom_bar(data=in16v03 %>%  filter(!is.na(tax.Clade),depth_m < 20), aes(x=as.factor(sample), y= abundNorm, fill=fct_lump(tax.Clade, 20)), stat='identity')  + theme_bw() + facet_wrap(. ~ ., scales = 'free') + coord_flip() + scale_fill_manual(values=jcols)
+
+```
+
+```{r}
+
+ggplot() + geom_bar(data=in16v03 %>%  filter(tax.Family %in% c('Cyanobiaceae', 'Cyanobacteriaceae', 'Chloroplast'),depth_m < 20), aes(x=as.factor(sample), y= abundNorm, fill=fct_lump(tax.Genus , 20)), stat='identity')  + theme_bw() + facet_wrap(. ~ ., scales = 'free') + coord_flip() #scale_fill_manual(values=jcols)
+
+
+```
+
+
+```{r}
+gtdb.named<- read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/pelagic.gtdb.taxonomy.norm.namedb.csv')
+
+
+table(gtdb.named$tax.Family)
+gtdb.named.cyano<- gtdb.named %>%  filter(tax.Family %in% c('f__Cyanobacteriaceae' , 'f__Cyanobiaceae'))
+
+gtdb.named.cyano <- gtdb.named.cyano %>% left_join(contextual.long, c('sample'='code'))
+
+gtdb.named.cyano <- gtdb.named.cyano %>% left_join(arb, c('seq'='zOTU'))
+```
+
+```{r}
+ggplot() + geom_bar(data=gtdb.named.cyano %>%  filter(nrs_location_code_voyage_code =='IN2016_v03',depth_m < 20), aes(x=as.factor(sample), y= abundNorm, fill=fct_lump(tax.Genus , 20)), stat='identity')  + theme_bw() + facet_wrap(. ~ ., scales = 'free') + coord_flip() #scale_fill_manual(values=jcols)
+
+
+```
+
+```{r}
+ggplot() + geom_bar(data=gtdb.named.cyano %>%  filter(nrs_location_code_voyage_code =='IN2016_v03',depth_m < 50), aes(x=as.factor(sample), y= abundNorm, fill=fct_lump(tax.subclade , 20)), stat='identity')  + theme_bw() + facet_wrap(. ~ ., scales = 'free') + coord_flip() #scale_fill_manual(values=jcols)
+
+```
+

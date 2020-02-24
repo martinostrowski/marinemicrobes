@@ -1,0 +1,1182 @@
+---
+title: "Cyanobacterial diversity at IMOS NRS time series using data from the Australian Microbiome Inititative"
+output: html_notebook
+---
+
+
+###Author: Martin Ostrowski
+####Contact: martin.ostrowski@uts.edu.au
+
+This is an R notebook providing details of the 
+
+
+
+Aims: Actual Sequence variants (ASVs) or zero-radius OTUs (zOTUs) provide enhanced taxonomic resolution of distinct cynaobacterial genotypes that may reveal population dynamics from 16S amplicon data (Mazard et al., 2012, Farrant et al., 2016). 
+
+
+In commonly used taxonomic databases, including Silva and the recently released Genome Taxonomy Database (GTDB) the taxonomic resolution is limited leading potentially inaccurate lineage assignments and to limited ecological insights from from a growing data resource. For example Silva taxonomic assigments place most Synechococcus as CC9902, and most Prochlorococcus as MIT9313.
+
+Ecophylogenomics studies currently estimate 18(?) lineages of Synechococcus and 5 major lineages for Prochlororoccus. GTDB currently estimates x and Y for subcluster 5.1 Synechococcus and Prochlorococcus respectively.
+```{r}
+library(tidyverse)
+library(oce)
+```
+
+
+```{r}
+contextual.long <- read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/contextual_marine_201907.csv')
+
+
+colnames(contextual.long) <- gsub(" ", "_", colnames(contextual.long), fixed = TRUE) #remove spaces
+colnames(contextual.long) <- gsub("[", "", colnames(contextual.long), fixed = TRUE) #remove brackets
+colnames(contextual.long) <- gsub("]", "", colnames(contextual.long), fixed = TRUE)
+colnames(contextual.long) <- gsub("/", "_per_", colnames(contextual.long), fixed = TRUE) #Winona says we should get rid of the slashes as well
+colnames(contextual.long) <- tolower(colnames(contextual.long)) #all lowercase
+
+contextual.long <- contextual.long  %>%
+  separate (sample_id, c("num", "code"), sep='/')
+
+contextual.long <- contextual.long %>%
+  separate(date_sampled, c('year','month','day'), sep='-', remove=F) # separate the YYYY-MM-DD format date into year, moth and day
+
+contextual.long$month.abb <- factor(month.abb[as.integer(contextual.long$month)], levels=c("Jan", "Feb","Mar", "Apr","May","Jun", "Jul","Aug","Sep","Oct","Nov", "Dec" )) # add levels from jan to dec
+
+contextual.long$nitrate_nitrite_μmol_per_l[contextual.long$nitrate_nitrite_μmol_per_l == -999.000]<-0.001;
+contextual.long$phosphate_μmol_per_l[contextual.long$phosphate_μmol_per_l == -999.000]<-0.001;
+contextual.long$salinity_ctd_psu[contextual.long$salinity_ctd_psu == -999.000]<-0.001;
+  contextual.long$silicate_μmol_per_l[contextual.long$silicate_μmol_per_l == -999.0000]<-0.001;
+contextual.long<- contextual.long[contextual.long$salinity_ctd_psu > 2,]
+
+
+
+```
+
+```{r, fig.width=4}
+shape<-readRDS('~/MarineMicrobes Dropbox/uniques/winona/fortified_shoreline_ggplot_models.RDS')
+
+ggplot() +   geom_polygon(data = fortify(shape %>% filter(between(long, 100, 160), between(lat,-60,0))), 
+               aes(x=long, y = lat, group = group), 
+               color =  NA, fill = "grey80") + 
+  theme_bw() +
+  geom_count(data=contextual.long %>% filter (depth_m < 25, between(longitude_decimal_degrees,90,180)), aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, color=nrs_location_code_voyage_code, alpha=1)) + scale_color_manual(values=mycols310, name="Voyage or Location") + coord_fixed(1.1) + labs(y='Latitide (degrees North)', x='Longitude (degress East)')
+
+```
+
+
+```{r}
+bac.nrs<-read_csv('~/Dropbox/bact.star/bacteria.STAR.csv')
+```
+
+
+```{r}
+ggplot(cyano.tax %>% filter(as.numeric(depth_m) < 10), aes(x=month, y=abund, fill=fct_lump(tax.subclade, 20))) + facet_wrap(nrs_location_code_voyage_code ~ .) + geom_bar( stat='identity') +theme_bw() + theme(legend.position='none')
+
+cyano.tax <- cyano %>% left_join(arb, by=c("zOTU"="X5"))
+
+table(cyano.tax$tax.clade)
+```
+
+Load the latest phylogenetically refined taxonomy for the AMI dataset
+
+```{r}
+
+
+arb<-read_csv('~/MarineMicrobes Dropbox/Martin Ostrowski/bact.star/cyano.pelagic.assignTax.draft3.csv')
+```
+
+Load the latest input file for bacterial 16S with lineages assigned to zOTUs against the Silva database (Silva 133)
+
+Join the zOTU clade and sub clade assignments on the basis of exact sequence matching
+ 
+! this should also be checked using the dada2 assignSpecies, and assignTaxonomy functions
+ 
+ 
+
+```{r}
+#silva<-read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/Pelagic_Public.csv')
+
+silva.named<-read_csv('~/MarineMicrobes Dropbox/uniques/BRT_2019/input/pelagic.silva2.taxonomy.norm.named.csv')
+
+#pelagic<- silva %>% group_by(zOTU, code) %>% summarise(sum=sum(abund))
+#cyano.sub <- cyano %>% select(zOTU, day, `month`,  year, latitude_decimal_degrees, longitude_decimal_degrees, `temperature_ctd_its-90,_deg_c`, nrs_location_code_voyage_code, depth_m, date_sampled, Family, Genus, Species)
+
+
+silva.named <- silva.named %>% left_join(arb, c('seq'='zOTU'))
+
+table(silva.named$tax.Family)
+cyanobact<- silva.named %>% filter(tax.Family %in% c('Cyanobiaceae', 'Cyanobacteriaceae', 'Chloroplast'))
+```
+
+
+```{r, fig.width=10}
+
+contextual.long$code <- as.numeric(contextual.long$code)
+cyanobact.cont<- cyanobact %>%  left_join(contextual.long, c('sample'='code'))
+
+silva.named.cont <- silva.named %>% group_by(sample, tax.Phylum, tax.Class, tax.Order) %>% summarise(Order.sums = sum(count))
+silva.named.cont <- silva.named.cont %>%  left_join(contextual.long, c('sample'='code'))
+
+silva.named.cont$depth_fac<- factor(silva.named.cont$depth_m, levels=rev(c(0, 10, 20, 25,30,40,50,75, 100)))
+silva.named.cont$nrs_location_code_voyage_code <- factor(silva.named.cont$nrs_location_code_voyage_code, levels= rev(c('MAI', 'KAI','PHB', 'ROT','NSI', 'YON',   'DAR')))
+```
+
+
+Load the color codes from Farrant et al., 2016, which are now consistently used throughout the literature.
+
+Synchronise the subclade names and create an additional factor for depth to tidy up the plotting
+```{r}
+petb.col<-read.table("~/MarineMicrobes Dropbox/Martin Ostrowski/Refined_provinces/petb2018/petb_col_codes2.txt", h=T, sep='\t')
+jcols<-as.character(petb.col$col)
+names(jcols)<-petb.col$clade
+
+
+names(jcols)[52]<-'IVa'
+unique(cyanobact.cont$tax.Clade)
+
+
+unique(cyanobact.cont$tax.subclade)
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='Iie']<- 'IIe'
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='Iih']<- 'IIh'
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='Iiabc']<- 'II'
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='IV']<- 'IVa'
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='HL']<- 'LLII-III'
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='VIa']<- 'VI'
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='VI']<- 'VIa'
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='LLII']<- 'LLII-III'
+cyanobact.cont$tax.subclade[cyanobact.cont$tax.subclade=='LLIII']<- 'LLII-III'
+
+cyanobact.cont$depth_fac<- factor(cyanobact.cont$depth_m, levels=rev(c(0, 10, 20, 25,30,40,50,75,100)))
+cyanobact.cont$nrs_location_code_voyage_code <- factor(cyanobact.cont$nrs_location_code_voyage_code, levels= rev(c('MAI', 'KAI','PHB', 'ROT','NSI', 'YON',   'DAR')))
+pros<- c('HLII', 'LLI', 'LLII-III', 'LLIV', 'HLI')
+syns <- !unique(cyanobact.cont$tax.Clade) %in% pros
+cyanobact.cont$tax.subclade <- factor(cyanobact.cont$tax.subclade, levels=rev(c("Ia", "IVa", 'IIh','IIe', 'II','IIIa', 'VI', 'EnvC', 'HLII', 'LLI', 'LLII-III', 'LLIV', 'HLI')))
+
+
+
+refineCyanoTax<-cyanobact.cont %>%  group_by(tax.Strain,  tax.subclade, seq) %>% summarise(tally = sum(count)) 
+
+#write_csv(refineCyanoTax, '~/refineCyanoTax.csv')
+```
+
+```{r, fig.width=8}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.subclade),depth_m < 20), aes(x=fct_reorder(as.factor(sample), `temperature_ctd_its-90,_deg_c`), y= count, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols) + theme_bw() + facet_wrap(nrs_location_code_voyage_code ~ ., scales = 'free') + coord_flip()
+
+```
+
+
+
+```{r, fig.width=10}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(Tax.gtdb),depth_m %in% c(0, 10, 20, 35,30,40,50,75), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=round(as.numeric(date_sampled)/max(as.numeric(date_sampled)), 3), y= count, color=Tax.gtdb, fill=fct_lump(tax.subclade, 20)), stat='identity', position='fill') + scale_fill_manual(values=jcols) + theme_bw() + facet_grid(depth_m ~ nrs_location_code_voyage_code, ) + scale_color_manual(values=c("#fdb0d2",
+"#00896f",
+"#fcb973"), aes(size=0.01))
+
+#is.na(Tax.gtdb)
+```
+
+```{r}
+mycol18<-c("#9c252b",
+"#ff7165",
+"#ffaa81",
+"#ea6a0e",
+"#706d00",
+"#82bd14",
+"#add276",
+"#8eb382",
+"#00872a",
+"#24c952",
+"#6edba0",
+"#007aad",
+"#464b95",
+"#aba6ff",
+"#8c8bff",
+"#5140b0",
+"#d8b5e9",
+"#b22ab1",
+"#7f3a67",
+"#ff90d3",
+"#b1005d")
+```
+
+
+```{r, fig.width=10}
+ggplot() + geom_bar(data=silva.named.cont %>%  
+                              filter(!is.na(tax.Order), 
+                              depth_m %in% c(0), 
+                              nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), 
+                    aes(x=date_sampled , y= Order.sums, fill=fct_lump(tax.Order, 20)), stat='identity', position='fill', width=20)  + 
+  theme_bw(base_size=18) + 
+  facet_grid(nrs_location_code_voyage_code ~ . ) + 
+  scale_fill_manual(values=mycol18, aes(size=0.01))
+
+#is.na(Tax.gtdb)
+```
+
+```{r, fig.width=3, fig.height=5}
+
+
+mycol22<-c("#f5a8be",
+"#80626a",
+"#98334f",
+"#a74330",
+"#ff9c6e",
+"#ad6927",
+"#ffce8b",
+"#ffe4c0",
+"#675602",
+"#dce681",
+"#678325",
+"#515b40",
+"#72b765",
+"#b2ffcb",
+"#007d50",
+"#e7fff2",
+"#4be3b6",
+"#02d9d2",
+"#018592",
+"#02bcdd",
+"#527683",
+"#91d3eb")
+
+
+#mcols<-as.vector(mycol18)
+
+mcols<-as.vector(mycol22)
+
+mcols[2] <-"#d50002"
+
+mcols[3] <-"#24c952"
+
+mcols[4] <-"#464b95"
+
+mcols[5] <-"#00872a"
+
+mcols[6] <-"#ea6a0e"
+
+mcols[7] <-"#ff90d3"
+
+mcols[8] <-"#706d00"
+
+mcols[9] <-"#aba6ff"
+
+unique(silva.named.cont$tax.Order)
+
+names.order<- silva.named.cont %>% group_by(tax.Order) %>%  summarise(totals = sum(Order.sums))
+
+
+names.order <- names.order %>% arrange( desc(totals))
+
+names(mcols)<-names.order$tax.Order[1:22]
+
+
+names(mcols)[1]<- 'Other'
+mcols[1] <-"#a8b0b1"
+
+
+ggplot() + geom_bar(data=silva.named.cont %>%  filter(!is.na(tax.Order), depth_m %in% c(0, 10), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=as.numeric(month.abb), y= Order.sums, fill=fct_lump(tax.Order, 15)), stat='identity', position='fill')  + 
+  theme_light(base_size = 8) + 
+  facet_grid(nrs_location_code_voyage_code ~ . ) + 
+  scale_fill_manual(values=mcols, name='Order') + labs(y='Relative Abundance', x= 'Month') +
+  scale_x_continuous(breaks=seq(1,12,1),labels=c("J","F","M","A","M","J","J","A","S","O","N","D"), expand = c(0.05,0.05)) + 
+  theme( strip.text.y = element_text(angle = 0)) 
+
+ggsave('~/star_fig_1d.pdf', height=5, width=4)
+```
+
+```{r}
+ggplot() + geom_bar(data=silva.named.cont %>%  filter(!is.na(tax.Order), depth_m %in% c(0,10,20), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON')), aes(x=date_sampled , y= Order.sums, fill=fct_lump(tax.Order,15)), stat='identity', position='fill', width=16) + 
+  scale_fill_manual(values=mcols, name='Bacterial 16S Order') + 
+  theme_light(base_size=12) + facet_grid(nrs_location_code_voyage_code ~ .)  + 
+  labs(x='Date Sampled', y='Relative Abundance') + theme(panel.spacing = unit(0.02, "cm")) + theme(axis.text.x=element_text(angle =0, hjust = 1))  + theme(strip.text.y = element_text(angle=0))
+
+ggsave('~/stars.figurepre1AA.pdf', width=10, height=6)
+
+#is.na(Tax.gtdb)
+```
+
+
+```{r, fig.width=3, fig.height=2}
+ggplot() + geom_boxplot(data=silva.named.cont %>%  
+                          filter(tax.Order %in% c('Synechococcales', 'Chloroplast', 'Rhodobacterales','SAR86_clade', 'SAR11_clade'), 
+                                                          depth_m %in% c(0,10,20,25,30,40,50), 
+                                 nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI')), 
+                        aes(x=nrs_location_code_voyage_code , y= Order.sums/80000, fill=as.factor(tax.Order)), outlier.alpha=0.3, lwd=0.5) + 
+  theme_light()  + 
+  labs(x='NRS Location ', y='Sequence Abundance')  +
+  scale_fill_manual(values=mcols, name='Group') +
+  theme(panel.spacing = unit(0.02, "cm")) + 
+  theme(axis.text.x=element_text(angle = 0, hjust = 1)) + 
+  theme(strip.text.y = element_text(angle=0)) 
+
+
+#geom_jitter(data=silva.named.cont %>%  filter(tax.Order %in% c( 'Chloroplast'), depth_m %in% c(0,10,20,25,30,40,50), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON')), aes(x=nrs_location_code_voyage_code , y= Order.sums,color=tax.Order), size=0.4, alpha=0.2)
+
+ggsave('~/summaryChloroSites3.pdf', height=5, width=5)
+```
+
+incorrect boxplot example
+```{r, fig.width=3, fig.height=4}
+ggplot() + geom_boxplot(data=silva.named.cont %>%  filter(!is.na(tax.Order), depth_m %in% c(0,10,20), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON')), aes(x=fct_lump(tax.Order,15) , y=fct_lump(tax.Order,15), Order.sums, group=as.numeric(month) ,fill=fct_lump(tax.Order,15))) + scale_fill_manual(values=mcols, name='Bacterial 16S Order') + theme_bw() + facet_grid(nrs_location_code_voyage_code ~ .)  + labs(x='month', y='relative abundance') + theme(panel.spacing = unit(0.02, "cm")) + theme(axis.text.x=element_text(angle = 45, hjust = 1)) +   scale_y_log10() + theme(strip.text.y = element_text(angle=0))
+```
+
+this area plot doesn't work either
+```{r, fig.width=10}
+ggplot() + 
+  geom_area(data=silva.named.cont %>%  filter(!is.na(tax.Order), depth_m %in% c(0,10,20), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON')), aes(x=date_sampled , y= Order.sums, fill=fct_lump(tax.Order, 12)), position='fill') + 
+  scale_fill_manual(values=mcols, name='Bacterial 16S Order') + theme_light() + 
+  facet_grid(nrs_location_code_voyage_code ~ .)  + 
+  labs(x='date', y='relative abundance') + 
+  theme(panel.spacing = unit(0.02, "cm")) + 
+  theme(axis.text.x=element_text(angle = 45, hjust = 1)) +   
+  scale_y_continuous(labels = scales::comma) + 
+  theme(strip.text.y = element_text(angle=0))
+
+
+```
+
+{r, fig.width=10}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(Tax.gtdb),depth_m %in% c(0, 10, 20, 35,30,40,50,75), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled, y= count, color=Tax.gtdb, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols) + theme_bw() + scale_color_manual(values=c("#fdb0d2",
+"#00896f",
+"#fcb973"), aes(lwd=0.01))
+
+
+
+{r, fig.width=10}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.Family),depth_m %in% c(0, 10, 20, 35,30,40,50,75), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=round(as.numeric(date_sampled)/max(as.numeric(date_sampled)), 3), y= count, color=tax.Genus, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols) + theme_bw() + scale_color_manual(values=c("#fdb0d2",
+"#00896f",
+"#fcb973","#7e367b"), aes(lwd=0.01))
+
+
+{r, fig.width=10}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.Clade),depth_m %in% c(0, 10, 20, 35,30,40,50,75), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=round(as.numeric(date_sampled)/max(as.numeric(date_sampled)), 3), y= count, color=tax.Clade, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols) + theme_bw() + scale_color_manual(values=mycol12, aes(lwd=0.01))
+
+mycol12<-c("#fdb0d2","#00896f","#fcb973","#7e367b","#982c16","#11e19c","#b9ab00","#5a51d7","#52d656","#c93801","#f660de","#ff66a2")
+
+
+```{r}
+mycol12<-c("#fdb0d2","#00896f","#fcb973","#7e367b","#982c16","#11e19c","#b9ab00","#5a51d7","#52d656","#c93801","#f660de","#ff66a2")
+clusters.df$code <- as.numeric(clusters.df$code)
+clusters.df <- clusters.df %>% left_join(contextual.long, 'code')
+
+clusters.df$depth_fac<-factor(clusters.df$depth_m, levels=rev(sort(unique(clusters.df$depth_m))))
+
+clusters.df$nrs_location_code_voyage_code <- factor(clusters.df$nrs_location_code_voyage_code, levels=rev(c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')))
+
+ggplot() + geom_tile(data=clusters.df %>%  filter( nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI')), aes(x=date_sampled , y= depth_fac, fill=as.factor(mycl1000.1000.x)), stat='identity', width=16) + 
+  scale_fill_manual(values=mycol12, name='Cluster') + 
+  theme_bw(base_size=12) + facet_grid(nrs_location_code_voyage_code ~ ., scales='free')  + 
+  labs(x='Date Sampled', y='Depth (m)') + theme(panel.spacing = unit(0.1, "cm")) + theme(axis.text.x=element_text(angle =0, hjust = 1))  + theme(strip.text.y = element_text(angle=0)) + scale_y_discrete(limits=levels(clusters.df$depth_m))
+
+
+ggsave('~/star_figure_1b.pdf', width=6, height=3.5)
+```
+
+```{r}
+silva.sub <-silva.named.cont %>% group_by(sample, tax.Order, Order.sums)
+
+silva.sub$sample<- as.numeric(silva.sub$sample)
+  
+  clusters.df$code<- factor( clusters.df$code, levels=c(unique(clusters.df$code)))
+
+silva.sub <- silva.sub %>% left_join(clusters.df, c('sample'='code'))
+
+silva.sub <- silva.sub %>% left_join(contextual.long, c('sample'='code'))
+
+```
+
+
+
+```{r, fig.width=8}
+
+ggplot() + geom_bar(data=silva.sub %>%  
+                      filter(nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), 
+                    aes(x=mycl1000.1000.x , y= Order.sums, fill=fct_lump(tax.Order, 16)), stat='identity', position='fill') + 
+  scale_fill_manual(values=mcols, name='Order') + 
+  theme_bw(base_size=10) + 
+  facet_grid( nrs_location_code_voyage_code ~month.abb, scales='free', ) + 
+  theme(panel.spacing = unit(0.02, "cm")) + coord_flip() + labs(x='Depth (m)', y='Relative Abundance') + scale_y_continuous(labels=c('0','0.25','0.5','0.75','1'))
+```
+
+
+```{r, fig.width=4}
+
+ggplot() + geom_bar(data=silva.sub %>%  
+                      filter(!is.na(mycl1000.1000.x),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), 
+                    aes(x=as.factor(mycl1000.1000.x) , y= Order.sums, fill=fct_lump(tax.Order, 16)), stat='identity', position='fill') + 
+  scale_fill_manual(values=mcols, name='Order') + 
+  theme_light(base_size=8) + 
+  theme(panel.spacing = unit(0.02, "cm")) + coord_flip() + labs(x='Cluster', y='Relative Abundance') #scale_y_continuous(labels=c('0','0.25','0.5','0.75','1'))
+
+ggsave('~/ten.clusters.fig1.pdf', height=4, width=4.5)
+```
+
+```{r}
+colnames(clusters.df)
+clusters.df.gather <- clusters.df %>% select(nrs_location_code_voyage_code, mycl1000.1000.x, depth_m, month, `temperature_ctd_its-90,_deg_c`, silicate_μmol_per_l, nitrate_nitrite_μmol_per_l, phosphate_μmol_per_l)
+
+colnames(clusters.df.gather) <-c("nrs_location_code_voyage_code", "Cluster", "Depth", "Month", "Temp", "Silicate", "NOx", "P")
+
+
+clusters.df.gather <- clusters.df.gather %>% gather(key=variable, value=value, -c(Cluster, nrs_location_code_voyage_code))
+
+ggplot(clusters.df.gather %>%  filter(!is.na(nrs_location_code_voyage_code))) +geom_boxplot(aes(x=as.factor(Cluster), y=as.numeric(value), na.rm=T, group=as.factor(Cluster), fill=as.factor(Cluster)), outlier.alpha=0.2, lwd=0.2) + facet_wrap(variable ~ ., scales='free_y')+scale_fill_manual(values=mycol12, 'Cluster') + new_scale('color') +
+  geom_jitter( aes(x=as.factor(Cluster), y=as.numeric(value), color=nrs_location_code_voyage_code), alpha=0.2, size=0.4) +scale_color_manual(values=nrscol, 'NRS Site') + theme_bw() + labs(x='Cluster', y='variable value (various units)')
+
+
+ggsave('~/nrs_fig1c.pdf', height=5, width=7)
+
+contextual.nrs<- contextual.long %>% filter(nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR'))
+
+
+silva.named.nrs<- silva.named %>% filter(sample %in% contextual.nrs$code)
+
+
+colnames(silva.named.nrs)
+
+silva.named.nrs.sub <- silva.named.nrs %>% select(sample,ID,abundNorm)
+
+hist(silva.named.nrs.sub$abundNorm, breaks=1000, xlim=c(0,100))
+
+
+silva.named.nrs.sub.100 <- silva.named.nrs.sub %>% filter(abundNorm > 99)
+
+#silva.named.nrs.sub.10.g<- silva.named.nrs.sub.10 %>% spread(key=ID, value=abundNorm, fill=0)
+
+library(reshape2)
+silva.named.nrs.sub.m<-acast(silva.named.nrs.sub.100, sample~ID, value.var="abundNorm", fun.aggregate = sum)
+
+
+
+dim(silva.named.nrs.sub.m)
+
+```
+
+```{r}
+rownames(silva.named.nrs.sub.m)
+colSums(silva.named.nrs.sub.m)
+rowSums(silva.named.nrs.sub.m)
+
+
+
+snnsm_nmds<-metaMDS(silva.named.nrs.sub.m)
+```
+
+```{r}
+
+names(snnsm_nmds)
+
+
+nmdspoints<- snnsm_nmds$points
+
+nmdspoints <- as.data.frame(nmdspoints)
+
+
+nmdspoints$code<-rownames(nmdspoints)
+
+nmdspoints$code <- as.numeric(nmdspoints$code)
+
+nmdspoints<- nmdspoints %>%  left_join(contextual.nrs, 'code')
+
+NRScols<-read_tsv("~/Dropbox/Rscripts/NRS_cols.txt")
+
+NRScols
+
+nrscol<- as.vector(NRScols$col)
+
+names(nrscol)<-NRScols$site
+```
+
+
+```{r, fig.width=9, fig.height=3}
+cont<-ggplot(nmdspoints %>% filter(MDS1 <5, depth_m < 20), aes(x=MDS1, y=MDS2, color=nrs_location_code_voyage_code), alpha=0.5) + geom_point() + theme_light() + geom_density_2d(aes(x=MDS1, y=MDS2, color=nrs_location_code_voyage_code), n=30, alpha=0.5) + facet_grid(. ~ month.abb) + scale_color_manual(values=nrscol, name='NRS Site')
+
+
+
+cont
+
+```
+
+
+```{r}
+library(gridExtra)
+install.packages('gridExtra')
+```
+
+
+```{r, fig.height=8}
+cont1<-ggplot(nmdspoints %>% filter(MDS1 <5, depth_m < 20), aes(x=date_sampled, y=MDS2, color=nrs_location_code_voyage_code), alpha=0.5) + geom_point() + theme_light() + geom_smooth(span=0.5) + scale_color_manual(values=nrscol, name='NRS Site')+ facet_grid( nrs_location_code_voyage_code ~ ., scales='free_y') + theme(strip.text.y = element_text(angle=0))
+
+cont2<-ggplot(nmdspoints %>% filter(MDS1 <5, depth_m < 20), aes(x=date_sampled, y=MDS1, color=nrs_location_code_voyage_code), alpha=0.5) + geom_point() + theme_light() + geom_smooth(span=0.5) + scale_color_manual(values=nrscol, name='NRS Site') + facet_grid( nrs_location_code_voyage_code ~ .,  scales='free_y') + theme(strip.text.y = element_text(angle=0))
+
+
+cont1<-ggplot(nmdspoints %>% filter(MDS1 <5, depth_m < 20, nrs_location_code_voyage_code %in% c('PHB', 'MAI', 'NSI')), aes(x=date_sampled, y=MDS1,  shape=nrs_location_code_voyage_code), alpha=0.5) +  geom_smooth(span=0.2, alpha=0.5, lwd=0.5,  aes(color=nrs_location_code_voyage_code)) + scale_color_manual(values=nrscol, name='NRS Site') +  scale_shape("NRS Site") +
+
+ new_scale('color') +
+  geom_point(aes(color=`temperature_ctd_its-90,_deg_c`)) + theme_bw() + scale_color_gradientn(colors=oce.colorsTemperature(100), name='Temperature (deg C)') 
+  + theme(strip.text.y = element_text(angle=0)) + labs(x='')
+
+  cont2<-ggplot(nmdspoints %>% filter(MDS2 <5, depth_m < 20, nrs_location_code_voyage_code %in% c('PHB', 'MAI', 'NSI')), aes(x=date_sampled, y=MDS2, shape=nrs_location_code_voyage_code), alpha=0.5) + scale_color_manual(values=nrscol, name='NRS Site')+ scale_shape("NRS Site") +
+    geom_smooth(span=0.2, alpha=0.5, lwd=0.5, aes(color=nrs_location_code_voyage_code)) +
+    
+     new_scale('color') + geom_point(aes(color=`temperature_ctd_its-90,_deg_c`)) + theme_bw() + scale_color_gradientn(colors=oce.colorsTemperature(100), name='Temperature (deg C)') +  theme(strip.text.y = element_text(angle=0)) + labs(x='Date Sampled')
+
+
+
+  
+  pdf(file='~/NRS.mds.time4.pdf', width=9, height=5)
+  grid.arrange(cont1, cont2, ncol=1)
+  
+  dev.off()
+
+new_scale <- function(new_aes) {
+   structure(ggplot2::standardise_aes_names(new_aes), class = "new_aes")
+}x
+
+
+ggplot_add.new_aes <- function(object, plot, object_name) {
+   plot$layers <- lapply(plot$layers, bump_aes, new_aes = object)
+   plot$scales$scales <- lapply(plot$scales$scales, bump_aes, new_aes = object)
+   plot$labels <- bump_aes(plot$labels, new_aes = object)
+   plot
+}
+install.packages('ggnewscale')
+library(ggnewscale)
+```
+
+
+```{r, fig.width=8, fig.height=3}
+  overall<-ggplot(nmdspoints %>% filter(MDS1 <5), aes(x=MDS1, y=MDS2, shape=nrs_location_code_voyage_code, alpha=0.5)) +geom_density2d(aes(color=nrs_location_code_voyage_code, lwd=0.2), alpha=0.5, size=0.5)+ scale_color_manual(values=nrscol, name='NRS Site')  + new_scale('color') +geom_point( alpha=0.5, lwd=1, aes(color=as.numeric(depth_m)), alpha=0.5) +
+
+ scale_color_gradientn(colors=oce.colorsViridis(15), name='Depth')+ scale_shape("NRS Site") + facet_wrap(. ~ month.abb ) +
+
+    
+     theme_bw()  +  theme(strip.text.y = element_text(angle=0)) + coord_fixed(1)
+
+overall
+
+ggsave('~/NRS.varaince.plot.all.pdf', width=7, height=6)
+
+
+```
+
+```{r}
+
+ggplot() + geom_bar(data=cyanobact.cont %>%  
+                      filter(!is.na(tax.subclade),depth_m %in% c(0, 10, 20, 25,30,40,50,75), 
+                             nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), 
+                    aes(x=depth_fac , y= count, fill=fct_lump(tax.subclade, 20)), stat='identity', position='fill') + 
+  scale_fill_manual(values=jcols, name='Phylotype') + 
+  theme_light(base_size=12) + 
+  facet_grid( nrs_location_code_voyage_code ~month.abb, scales='free', ) + 
+  theme(panel.spacing = unit(0.02, "cm")) + coord_flip() + labs(x='Depth (m)', y='Relative Abundance') + scale_y_continuous(labels=c('0','0.25','0.5','0.75','1'))
+
+ggsave('~/cyano_depth_profiles_NRS2.pdf', height=6, width=10)
+```
+
+
+```{r}
+ggplot() + geom_bar(data=silva.sub %>%  
+                      filter(!is.na(mycl1000.1000.x),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), 
+                    aes(x=as.factor(mycl1000.1000.x) , y= Order.sums, fill=fct_lump(tax.Order, 16)), stat='identity', position='fill') + 
+  scale_fill_manual(values=mcols, name='Order') + 
+  theme_light(base_size=8) + 
+  theme(panel.spacing = unit(0.02, "cm")) + coord_flip() + labs(x='Cluster', y='Relative Abundance') #scale_y_continuous(labels=c('0','0.25','0.5','0.75','1'))
+
+ggsave('~/ten.clusters.fig1.pdf', height=4, width=4.5)
+```
+
+
+```{r}
+dim(si)
+```
+
+
+```{r, fig.width=8}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.subclade),!tax.subclade %in% pros, depth_m %in% c(0, 10, 20, 25,30,40,50,75), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=depth_fac , y= count, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols, name='Synechococcus sub clade') + theme_bw() + facet_grid(month.abb~ nrs_location_code_voyage_code, scales='free_x') + coord_flip() + labs(y='depth (m)', x='relative abundance (/20000)') + theme(panel.spacing = unit(0.02, "cm"))
+
+
+
+
+
+
+ggplot() + geom_area(data=cyanobact.cont.nona.mai %>%  filter(!is.na(tax.subclade),!tax.subclade %in% pros, nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=as.numeric(date_sampled)/max(as.numeric(date_sampled)) , y= count, color=fct_lump(tax.subclade, 20), fill=fct_lump(tax.subclade, 20)), stat='identity', position='fill',size=1) + scale_color_manual(values=jcols, name='Synechococcus sub clade') + theme_bw() + facet_grid(.~., scales='free_y')  + labs(y='depth (m)', x='relative abundance (/20000)') + theme(panel.spacing = unit(0.02, "cm")) +scale_fill_manual(values=jcols, name='Synechococcus sub clade')
+
+#color=fct_lump(tax.subclade, 20)
+
+cyanobact.cont.nona.mai.d <- cyanobact.cont.nona.mai %>% group_by(`date_sampled`, `tax.subclade`, nrs_location_code_voyage_code) %>% summarise(abunds = sum(count))
+```
+
+
+ggplot() + geom_line(data=cyanobact.cont.nona.mai.d %>%  filter(!is.na(tax.subclade), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=as.numeric(date_sampled)/max(as.numeric(date_sampled)) , y= abunds, color=fct_lump(tax.subclade, 20), linetype='series', fill=fct_lump(tax.subclade, 20)), stat='identity', position='stack',size=1) + scale_color_manual(values=jcols, name='Synechococcus sub clade') + theme_bw() + facet_grid(.~., scales='free_y')  + labs(y='depth (m)', x='relative abundance (/20000)') + theme(panel.spacing = unit(0.02, "cm")) +scale_fill_manual(values=jcols, name='Synechococcus sub clade')
+
+
+```{r}
+
+cyanobact.cont.nona<- cyanobact.cont %>% filter(!is.na(tax.subclade))
+cyanobact.cont.nona.mai<- cyanobact.cont.nona %>% filter(nrs_location_code_voyage_code == 'MAI')
+cyanobact.cont.nona.mai.d <- cyanobact.cont.nona.mai %>% group_by(`date_sampled`, `tax.subclade`, nrs_location_code_voyage_code) %>% summarise(abunds = sum(count))
+
+test <- cyanobact.cont.nona.mai.d %>%  spread(key = tax.subclade, value=abunds, -c(1,3), fill='NA')
+test.g <- test %>% gather(key =tax.subclade, value=abunds, -c(1,2) )
+
+test<-rbind(nsi.test.g, test.g, phb.test.g, rot.test.g, yon.test.g, kai.test.g, dar.test.g)
+test$tax.subclade <- factor(test$tax.subclade, levels=c( 'Ia', 'IVa', 'IIh', 'IIe', 'II', 'HLII','LLI'))
+test$nrs_location_code_voyage_code <- factor(test$nrs_location_code_voyage_code, levels= rev(c('MAI', 'KAI', 'ROT', 'PHB', 'NSI', 'YON',  'DAR')))
+```
+
+```{r, fig.height=6, fig.width=10}
+pmai<- ggplot(data=test.g %>%  filter(!is.na(abunds),  tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=as.numeric(date_sampled)/max(as.numeric(date_sampled)) , y= abunds, color=fct_lump(tax.subclade, 20), linetype='series', fill=fct_lump(tax.subclade, 20)), stat='identity',size=1) + geom_point() + geom_line() +scale_color_manual(values=jcols, name='Synechococcus sub clade') + theme_bw() + facet_grid(.~., scales='free_y')  + labs(y='depth (m)', x='Date Sampled') + theme(panel.spacing = unit(0.02, "cm")) +scale_fill_manual(values=jcols, name='Synechococcus sub clade')
+pmai
+
+
+
+ggplot(data=test.g %>%  filter(  tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, color=fct_lump(tax.subclade, 20), linetype='series', fill=fct_lump(tax.subclade, 20)), stat='identity',position='fill') + geom_point() + geom_line() +scale_color_manual(values=jcols, name='Phylotype') + theme_bw() + facet_grid(.~., scales='free_y')  + labs(y='depth (m)', x='relative abundance (/20000)') + theme(panel.spacing = unit(0.02, "cm")) +scale_fill_manual(values=jcols, name='Phylotype') + scale_x_date()
+
+ggplot() +
+  geom_area(data=test.g %>%  filter(  tax.subclade %in% c('Ia', 'IVa', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, color=fct_lump(tax.subclade, 20), linetype='series', fill=fct_lump(tax.subclade, 20)), stat='identity', position='fill') +scale_color_manual(values=jcols, name='Phylotype') + theme_bw() + facet_grid(nrs_location_code_voyage_code~., scales='free_y')  + labs(y='depth (m)', x='Date') + theme(panel.spacing = unit(0.02, "cm")) +scale_fill_manual(values=jcols, name='Phylotype') + scale_x_date()
+
+write_csv(test, 'cyano_16S_cladesNRS.csv')
+
+```
+
+```{r, fig.height=6, fig.width=10}
+ggplot() +
+  
+  geom_area(data=test.g %>%  filter(tax.subclade %in% c('HLII', 'LLI'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, fill=fct_lump(tax.subclade, 20)), stat='identity', position='fill')  + theme_bw() + facet_grid(nrs_location_code_voyage_code~., scales='free_y')  + labs(y='depth (m)', x='Date') + theme(panel.spacing = unit(0.02, "cm")) +scale_fill_manual(values=jcols, name='Prochlorococcus sub clade') + scale_x_date()
+```
+
+```{r, fig.width=8}
+ggplot() +
+  
+  geom_line(data=test.g %>%  filter(nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y=abunds, color=fct_lump(tax.subclade, 20), linetype='series', fill=fct_lump(tax.subclade, 20)), stat='identity') +scale_color_manual(values=jcols, name='Synechococcus sub clade') + theme_bw() + facet_grid(nrs_location_code_voyage_code~.)  + labs(y='depth (m)', x='Date') + theme(panel.spacing = unit(0.02, "cm")) +scale_fill_manual(values=jcols, name='Synechococcus sub clade') + scale_x_date() +   geom_point(data=test %>%  filter(nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, color=fct_lump(tax.subclade, 20), linetype='series'), stat='identity') +scale_color_manual(values=jcols, name='Synechococcus sub clade') + theme_bw() +scale_y_log10()
+```
+
+
+```{r}
+cells<-read_csv('~/db/Martin Ostrowski/bact.star/imos_cells_date.csv')
+
+test
+
+
+imos$date <- ymd(imos$date )
+
+test<- test %>% left_join(imos, c('date_sampled'='date', 'nrs_location_code_voyage_code'='IMOS_SITE_CODE'))
+
+unique(test$date_sampled) %in% unique(imos$date)
+
+synsubtotals<- test %>% filter(!tax.subclade %in% c('HLII', 'LLI')) %>% group_by(nrs_location_code_voyage_code, date_sampled) %>%  summarise(subtotal=sum(abunds))
+
+
+synsubtotals <- synsubtotals %>% filter(!is.na(subtotal))
+
+test <- test %>% left_join(synsubtotals, c('date_sampled', 'nrs_location_code_voyage_code'))
+
+
+test$scaled.syn <- (test$abunds/test$subtotal) * test$SYNECOCHOCCUS_CELLSPERML
+
+test
+
+ggplot(data=site_totals_gather) + 
+  theme(panel.spacing = unit(0.02, "cm")) +
+  theme_bw() +scale_y_log10()+ 
+  facet_grid(nrs_code ~.) +theme_bw()  +
+  scale_fill_manual(values=jcols, name='Synechococcus sub clade') + 
+  scale_x_date() +   
+  geom_area(data=site_totals_gather %>%  
+              filter(nrs_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), 
+            aes(x=ymd , y=prop *synCells , fill=tax.subclade, linetype='series'), stat='identity', position='stack')+
+              scale_fill_manual(values=jcols, name='Synechococcus sub clade') + theme_bw() +
+              scale_color_manual(values=jcols, name='Synechococcus sub clade')
+
+
+site_totals_gather$tax.subclade <- factor(site_totals_gather$tax.subclade, levels=rev(c( 'Ia', 'IVa', 'IIh', 'IIe', 'II', 'SC5.2_5.3', 'HLII','LLI')))
+
+
+
+names(jcols)[45] <-'SC5.2_5.3'
+
+site_totals_gather$nrs_code <- factor(site_totals_gather$nrs_code, levels= rev(c('MAI', 'KAI', 'ROT', 'PHB', 'NSI', 'YON',  'DAR')))
+
+library(lubridate)
+site_totals_gather$ymd<- as_date(site_totals_gather$UTC_TRIP_START_TIME)
+
+site_totals_gather$year<- year(site_totals_gather$ymd)
+site_totals_gather$month<- month(site_totals_gather$ymd)
+site_totals_gather$week<- week(site_totals_gather$ymd)
+
+```
+
+```{r, fig.width=5}
+  library(scales)
+scientific_10 <- function(x) {
+  parse(text=gsub("e", " %*% 10^", scales::scientific_format()(x)))
+}
+
+
+options(scipen=10000)
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=14) +                                                                                                                                        
+geom_bar(data=site_totals_gather %>% filter(!tax.subclade %in% c('HLII', 'LLI'), nrs_code %in% c('MAI',  'PHB', 'NSI')), aes(x=month-0.2  , y= prop*synCells, fill=tax.subclade), stat='identity', position='stack', width=0.4) + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) + 
+geom_bar(data=site_totals_gather %>% filter(tax.subclade %in% c('HLII', 'LLI'),nrs_code %in% c('MAI', 'PHB', 'NSI')), aes(x=month+0.2  , y= prop*proCells, fill=tax.subclade), stat='identity', position='stack', width=0.4) + labs(y=bquote('Abundance (cells' ~ml^-1*')'))+ facet_grid(nrs_code ~ .) +                                scale_fill_manual(values=jcols, name='Cyanobacteria sub clade') + theme_bw() + scale_y_continuous(label= function(x) {ifelse(x==0, "0", parse(text=gsub("[+]", "", gsub("e", " %*% 10^", scientific_format()(x)))))} ) + scale_x_continuous(breaks=seq(1,12,1),labels=c("J","F","M","A","M","J","J","A","S","O","N","D"))
+
+#bquote('Assimilation ('*mu~ 'mol' ~CO[2]~ m^-2~s^-1*')'))
+
+ggsave('~/synpro_sseasonalbar2.pdf', width=7, height=5)
+
+
+ggsave('~/synpro_sseasonalbar.pdf', width=7, height=5)
+
+```
+
+
+```{r}
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=14) +                                                                                                                                        
+geom_bar(data=site_totals_gather %>% filter(!tax.subclade %in% c('HLII', 'LLI'), nrs_code %in% c('MAI', 'PHB', 'NSI')), aes(x=month-0.2  , y= prop*synCells, fill=tax.subclade), stat='identity', position='stack', width=0.4) + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) + 
+geom_bar(data=site_totals_gather %>% filter(tax.subclade %in% c('HLII', 'LLI'),nrs_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON')), aes(x=month+0.2  , y= prop*proCells, fill=tax.subclade), stat='identity', position='stack', width=0.4) + labs(y=bquote('Abundance (cells' ~ml^-1*')'))+ facet_grid(nrs_code ~ year, scales='free_y') +                                scale_fill_manual(values=jcols, name='Cyanobacteria sub clade') + theme_bw() + scale_y_continuous(label= function(x) {ifelse(x==0, "0", parse(text=gsub("[+]", "", gsub("e", " %*% 10^", scientific_format()(x)))))} ) + scale_x_continuous(breaks=seq(1,12,1),labels=c("J","F","M","A","M","J","J","A","S","O","N","D"))  + theme(panel.spacing = unit(0.02, "cm"))
+
+ggsave('~/synpro_yearlybar.pdf', width=11, height=7)
+```
+
+
+```{r}
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=14) +                                                                                                                                        
+geom_bar(data=site_totals_gather %>% filter(!tax.subclade %in% c('HLII', 'LLI'), nrs_code %in% c('MAI')), aes(x=ymd  , y= (prop*proCells)/1000, fill=tax.subclade), stat='identity', position='stack', width=20) +
+
+labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) + 
+#geom_bar(data=site_totals_gather %>% filter(tax.subclade %in% c('HLII', 'LLI'),nrs_code %in% c('MAI')), aes(x=ymd  , y= prop*proCells, fill=tax.subclade), stat='identity', position='stack', width=20) + 
+  labs(y=bquote('cells (x10'^3 ~ml^-1*')'))+ 
+  facet_grid(nrs_code ~., scales='free_y') +                                
+  scale_fill_manual(values=jcols, name='Cyanobacteria sub clade') + theme_bw() + 
+theme(panel.spacing = unit(0.02, "cm"))
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                      #scale_x_continuous(breaks=seq(1,12,1),labels=c("J","F","M","A","M","J","J","A","S","O","N","D")) 
+
+ggsave('~/synpro_nsibar.pdf', width=9, height=1.9)
+ggsave('~/synpro_phbbar.pdf', width=9, height=1.9)
+ggsave('~/synpro_maibar.pdf', width=9, height=1.9)
+
+ggsave('~/pro_nsibar.pdf', width=9, height=1.9)
+ggsave('~/pro_phbbar.pdf', width=9, height=1.9)
+ggsave('~/pro_maibar.pdf', width=9, height=1.9)
+```
+
+jcols
+```{r, fig.width=7, fig.height=5}
+options(scipen=10000)
+ggplot()        +                                                                                                    theme_bw(base_size=14) +                                                                                                                                        
+geom_line(data=site_totals_gather %>% filter(!tax.subclade %in% c('HLII', 'LLI'), nrs_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON')), aes(x=month  , y= prop*synCells, color=tax.subclade), formula=y ~ poly(x, 2)) + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) + 
+  geom_point(data=site_totals_gather %>% filter(!tax.subclade %in% c('HLII', 'LLI'), nrs_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON')), aes(x=month  , y= prop*synCells, color=tax.subclade), formula=y ~ poly(x, 2)) + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) + 
+  
+  
+geom_line(data=site_totals_gather %>% filter(tax.subclade %in% c('HLII', 'LLI'),nrs_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON')), aes(x=month  , y= prop*proCells, color=tax.subclade), formula=y ~ poly(x, 2)) + 
+  geom_point(data=site_totals_gather %>% filter(tax.subclade %in% c('HLII', 'LLI'),nrs_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON')), aes(x=month  , y= prop*proCells, color=tax.subclade), formula=y ~ poly(x, 2)) + 
+  
+  labs(y=bquote('Abundance (cells' ~ml^-1*')'))+ facet_grid(nrs_code ~ year, scales='free_y') +                                scale_color_manual(values=jcols, name='Cyanobacteria sub clade') + theme_bw() + scale_y_log10(label= function(x) {ifelse(x==0, "0", parse(text=gsub("[+]", "", gsub("e", " %*% 10^", scientific_format()(x)))))} ) + scale_x_continuous(breaks=seq(1,12,1),labels=c("J","F","M","A","M","J","J","A","S","O","N","D")) +  theme(panel.spacing = unit(0.02, "cm"))   
+
+
+?geom_smooth
+
+ggsave('~/prosyn.yearly.pdf', width=9, height=7)
+```
+
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=14) +   geom_point(data=site_totals_gather, aes(x=month , y= proCells)) +geom_point(data=site_totals_gather, aes(x=month , y= synCells)) +
+geom_smooth(data=site_totals_gather, aes(x=month , y= proCells))  + theme(panel.spacing = unit(0.02, "cm")) +  
+geom_smooth(data=site_totals_gather, aes(x=month+0.5  , y= synCells)) + labs(y='Abundance', x='Month')  +facet_grid(nrs_code ~.)  +                                                                             scale_color_manual(values=c('green', "#f44f4f"), name='Synechococcus sub clade') + theme_bw() +scale_color_manual(values=jcols, name='Synechococcus sub clade') + scale_y_log10()
+
+```{r}
+
+xx
+```
+
+
+
+```{r}
+silva.named.cont.sub <- silva.named.cont %>% filter(depth_m==0, nrs_location_code_voyage_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON'), tax.Order %in% c('Chloroplast', 'Synechococcales', 'Rhodobacterales', 'Pelagibacterales', 'SAR_86')) %>% group_by(date_sampled,month, nrs_location_code_voyage_code, tax.Order, year) %>% summarise (total = sum(Order.sums))
+
+
+silva.named.cont.sub$month <- as.numeric(silva.named.cont.sub$month)
+
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=8) +                                                                                                                                        
+geom_smooth(data=silva.named.cont.sub %>% filter(nrs_location_code_voyage_code %in% c('MAI',  'PHB', 'NSI', 'YON'), tax.Order %in% c('Chloroplast', 'Synechococcales', 'Rhodobacterales')), aes(x=month, y= total, color=tax.Order), span=0.5) + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) + geom_point(data=silva.named.cont.sub %>% filter( nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON'), tax.Order %in% c('Chloroplast', 'Synechococcales', 'Rhodobacterales')), aes(x=month , y= total, color=tax.Order)) + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) +
+
+
+ facet_grid(nrs_location_code_voyage_code ~ ., scales='free_y') + theme_bw()  + theme(panel.spacing = unit(0.02, "cm")) + scale_color_manual(values=c("#027e00", "#00d3fd","#ff9f41"), name='Order')
+
+
+    #breaks=seq(1,12,1),labels=c("J","F","M","A","M","J","J","A","S","O","N","D")
+ggsave('~/order_ysmooth.pdf', width=11, height=7)
+```
+
+
+```{r}
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=8) +                                                                                                                                        
+geom_line(data=silva.named.cont.sub %>% filter( nrs_location_code_voyage_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON'), tax.Order %in% c('Chloroplast', 'Synechococcales', 'Rhodobacterales')), aes(x=date_sampled  , y= total, color=fct_lump(tax.Order, 12))) + labs( x='Year') + theme(panel.spacing = unit(0.02, "cm")) + geom_point(data=silva.named.cont.sub %>% filter( nrs_location_code_voyage_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON'), tax.Order %in% c('Chloroplast', 'Synechococcales', 'Rhodobacterales')), aes(x=date_sampled  , y= total, color=fct_lump(tax.Order, 12))) + labs( x='Year') + theme(panel.spacing = unit(0.02, "cm")) +
+
+
+ facet_grid(nrs_location_code_voyage_code ~ ., scales='free_y') + theme_bw()    + theme(panel.spacing = unit(0.02, "cm")) + scale_color_manual(values=c("#027e00", "#00d3fd","#ff9f41"), name='Order')
+```
+
+
+```{r}
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=8) +                                                                                                                                        
+geom_bar(data=silva.named.cont.sub %>% filter( nrs_location_code_voyage_code %in% c('NSI'), tax.Order %in% c('Chloroplast', 'Synechococcales', 'Rhodobacterales', 'Pelagibacterales', 'SAR_86')), aes(x=date_sampled  , y= total/150000, fill=fct_lump(tax.Order, 12)), stat='identity', position='stack', width=20) + labs( x='Year', y='Rel Abund') + theme(panel.spacing = unit(0.02, "cm")) +
+
+
+ facet_grid(nrs_location_code_voyage_code ~ ., scales='free_y') + theme_bw()   + theme(panel.spacing = unit(0.02, "cm")) + scale_fill_manual(values=c("#027e00", "#00d3fd","#ff9f41", "#a4122e"), name='Order') 
+
+
+ggsave('~/order_maiybar.pdf', width=7, height=1.6)
+
+ggsave('~/order_phbybar.pdf', width=7, height=1.6)
+
+ggsave('~/order_nsiybar.pdf', width=7, height=1.6)
+
+ggsave('~/order_ybar.pdf', width=7, height=1.6)
+ggsave('~/order_ybar.pdf', width=11, height=7)
+```
+
+
+```{r}
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=8) +                                                                                                                                        
+geom_violin(data=site_totals_gather %>% filter( nrs_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON')), aes(y=month  , width= prop*synCells,x=tax.subclade), stat = identity) + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) + coord_flip() +
+
+
+ facet_wrap(nrs_code ~., scales='free_y', ncol=1) + theme_bw()   + theme(panel.spacing = unit(0.02, "cm")) + scale_color_manual(values=jcols, name='Order')
+
+ggsave('~/order_ybar.pdf', width=11, height=7)
+```
+
+```{r}
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=8) +                                                                                                                                        
+geom_point(data=contextual.long %>% filter( nrs_location_code_voyage_code %in% c('MAI', 'ROT', 'PHB', 'NSI', 'YON')), aes(x=date_sampled  , size= total, color=tax.Order, y=nrs_location_code_voyage_code), stat='identity') + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) +
+
+
+ facet_wrap( tax.subclade ~., scales='free_y', ncol=1) + theme_bw()   + theme(panel.spacing = unit(0.02, "cm")) + scale_color_manual(values=jcols, name='Order')
+
+ggsave('~/order_pointbar.pdf', width=11, height=7)
+```
+
+as.factor(as.numeric(UTC_TRIP_START_TIME))
+
+library(tidyverse)
+write_csv(test, '~/test.join.csv')
+
+site_totals<-read_tsv('~/Dropbox/bact.star/syn_pro_totals.csv')
+
+test<-read_csv('~/test.join.csv')
+
+test <- test %>% left_join(site_totals, c('_TRIP_CODE'= 'site_code'))
+
+site_totals$site_code %in% test$`_TRIP_CODE`
+
+write_csv(imos, '~/imos.cytometry.201912.csv')
+
+
+?geom_bar()
+
+
+
+
+```{r, fig.height=2, fig.width=8}
+cyanobact.cont.nona.nsi<- cyanobact.cont.nona %>% filter(nrs_location_code_voyage_code == 'NSI')
+cyanobact.cont.nona.nsi.d <- cyanobact.cont.nona.nsi %>% group_by(`date_sampled`,`tax.subclade`, nrs_location_code_voyage_code) %>% summarise(abunds = sum(count))
+nsi.test <- cyanobact.cont.nona.nsi.d %>%  spread(key = tax.subclade, value=abunds, -c(1,3), fill='NA')
+
+nsi.test.g <- nsi.test %>% gather(key =tax.subclade, value=abunds, -c(1,2) )
+
+cyanobact.cont.nona.rot<- cyanobact.cont.nona %>% filter(nrs_location_code_voyage_code == 'ROT')
+cyanobact.cont.nona.rot.d <- cyanobact.cont.nona.rot %>% group_by(`date_sampled`,`tax.subclade`, nrs_location_code_voyage_code) %>% summarise(abunds = sum(count))
+rot.test <- cyanobact.cont.nona.rot.d %>%  spread(key = tax.subclade, value=abunds, -c(1,3), fill='NA')
+
+rot.test.g <- rot.test %>% gather(key =tax.subclade, value=abunds, -c(1,2) )
+
+
+cyanobact.cont.nona.phb<- cyanobact.cont.nona %>% filter(nrs_location_code_voyage_code == 'PHB')
+cyanobact.cont.nona.phb.d <- cyanobact.cont.nona.phb %>% group_by(`date_sampled`, `tax.subclade`, nrs_location_code_voyage_code) %>% summarise(abunds = sum(count))
+phb.test <- cyanobact.cont.nona.phb.d %>%  spread(key = tax.subclade, value=abunds, -c(1,3), fill='NA')
+
+phb.test.g <- phb.test %>% gather(key =tax.subclade, value=abunds, -c(1,2) )
+
+cyanobact.cont.nona.yon<- cyanobact.cont.nona %>% filter(nrs_location_code_voyage_code == 'YON')
+cyanobact.cont.nona.yon.d <- cyanobact.cont.nona.yon %>% group_by(`date_sampled`, `tax.subclade`, nrs_location_code_voyage_code) %>% summarise(abunds = sum(count))
+yon.test <- cyanobact.cont.nona.yon.d %>%  spread(key = tax.subclade, value=abunds, -c(1,3), fill='NA')
+
+yon.test.g <- yon.test %>% gather(key =tax.subclade, value=abunds, -c(1,2) )
+
+cyanobact.cont.nona.kai<- cyanobact.cont.nona %>% filter(nrs_location_code_voyage_code == 'KAI')
+cyanobact.cont.nona.kai.d <- cyanobact.cont.nona.kai %>% group_by(`date_sampled`, `tax.subclade`, nrs_location_code_voyage_code) %>% summarise(abunds = sum(count))
+kai.test <- cyanobact.cont.nona.kai.d %>%  spread(key = tax.subclade, value=abunds, -c(1,3), fill='NA')
+
+kai.test.g <- kai.test %>% gather(key =tax.subclade, value=abunds, -c(1,2) )
+
+cyanobact.cont.nona.dar<- cyanobact.cont.nona %>% filter(nrs_location_code_voyage_code == 'DAR')
+cyanobact.cont.nona.dar.d <- cyanobact.cont.nona.dar %>% group_by(`date_sampled`, `tax.subclade`, nrs_location_code_voyage_code) %>% summarise(abunds = sum(count))
+dar.test <- cyanobact.cont.nona.dar.d %>%  spread(key = tax.subclade, value=abunds, -c(1,3), fill='NA')
+
+dar.test.g <- dar.test %>% gather(key =tax.subclade, value=abunds, -c(1,2) )
+
+
+
+
+
+write.csv(nsi.test.g, '~/nsi.test.g.csv')
+write.csv(nsi.test.g, '~/phb.test.g.csv')
+write.csv(test.g, '~/mai.test.g.csv')
+
+format(as.Date(nsi.test.g$date_sampled), "%Y-%m-%d")
+
+nsi.test.g<-nsi.test.g %>% separate(date_sampled, c('year', 'month'), sep='-', remove=F)
+
+mai.test.g<-test.g %>% separate(date_sampled, c('year', 'month'), sep='-', remove=F)
+
+phb.test.g<-phb.test.g %>% separate(date_sampled, c('year', 'month'), sep='-', remove=F)
+
+
+nsi.test.g<-read_csv('~/Downloads/nsi.test.g.csv')
+mai.test.g<-read_csv('~/Downloads/mai.test.g.csv') 
+
+phb.test.g<-read_csv('~/Downloads/phb.test.g.csv') 
+
+
+
+```
+
+
+```{r, fig.height=1.5, fig.width=6}
+```
+
+```{r, fig.height=1.5, fig.width=6}
+pnsi<-ggplot(data=nsi.test.g %>%  filter(!is.na(abunds), tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, color=fct_lump(tax.subclade, 20),  fill=fct_lump(tax.subclade, 20)), stat='identity',size=1) + geom_point() + geom_line() +scale_color_manual(values=jcols, name='Phylotype') + 
+  theme_bw() + 
+  facet_grid(.~., scales='free_y')  + 
+  labs(x='Date Sampled', y='Abundance') + 
+  theme(panel.spacing = unit(0.02, "cm")) +
+  scale_fill_manual(values=jcols, name='Phylotype') + ylim(10,50000)
+
+pnsi
+```
+
+```{r}
+pnsi<-ggplot(data=nsi.test.g %>%  filter(!is.na(abunds), tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, color=fct_lump(tax.subclade, 20),  
+                                                                                                                                                                                                                         fill=fct_lump(tax.subclade, 20)), 
+             stat='identity',size=1) + geom_point() + geom_line() +scale_color_manual(values=jcols, name='Phylotype') + 
+  theme_bw() + 
+  facet_grid(.~., scales='free_y')  +   
+  labs(x='Date Sampled', y='Abundance') +  
+  theme(panel.spacing = unit(0.02, "cm")) +
+  scale_fill_manual(values=jcols, name='Phylotype') + 
+  ylim(10,50000)
+
+pnsi
+```
+
+
+
+```{r, fig.height=1.5, fig.width=6}
+pphbcyanobact.cont.nona.phb.d <- cyanobact.cont.nona.phb %>% group_by(`date_sampled`, `tax.subclade`, nrs_location_code_voyage_code) %>% 
+  summarise(abunds = sum(count))
+phb.test <- cyanobact.cont.nona.phb.d %>%  spread(key = tax.subclade, value=abunds, -c(1,3), fill='NA')
+
+phb.test.g <- phb.test %>% gather(key =tax.subclade, value=abunds, -c(1,2) )
+```
+
+
+```{r, fig.height=1.5, fig.width=6}
+pphb<-ggplot(data=phb.test.g %>%  filter(!is.na(abunds), tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=as.numeric(date_sampled)/max(as.numeric(date_sampled)) , y= abunds, color=fct_lump(tax.subclade, 20), fill=fct_lump(tax.subclade, 20)), stat='identity',size=1) + geom_point() + geom_line() +scale_color_manual(values=jcols, name='Phylotype') + theme_bw() + facet_grid(.~., scales='free_y')  + labs(y='depth (m)', x='relative abundance') + theme(panel.spacing = unit(0.02, "cm")) +scale_fill_manual(values=jcols, name='Phylotype')
+
+pphb
+```
+
+```{r, fig.height=1.5, fig.width=6}
+pmai<-ggplot(data=mai.test.g %>%  filter(!is.na(abunds), tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, color=fct_lump(tax.subclade, 20)),size=1) + geom_point() +geom_line() +scale_color_manual(values=jcols, name='sub clade')+ theme_bw(base_size=16) + facet_grid(.~., scales='free_y')  + labs(y='Abundance', x='Date Sampled') + theme(panel.spacing = unit(0.02, "cm"))  #scale_x_continuous(breaks=seq(1,12,1),labels=c("J", "F","M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) 
+
+
+pmai
+
+
+pphb<-ggplot(data=phb.test.g %>%  filter(!is.na(abunds), tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, color=fct_lump(tax.subclade, 20), stat='identity')) + geom_point() + geom_line() +scale_color_manual(values=jcols, name='sub clade') +  theme_bw(base_size=16) + facet_grid(.~., scales='free_y')  + labs(y='Abundance', x='Date Sampled') + theme(panel.spacing = unit(0.02, "cm")) #scale_x_continuous(breaks=seq(1,12,1),labels=c("J", "F","M", "A", "M", "J", "J", "A", "S", "O", "N", "D"))
+pphb
+
+
+
+pnsi<-ggplot(data=nsi.test.g %>%  filter( tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=date_sampled , y= abunds, color=fct_lump(tax.subclade, 20)), stat='identity') + geom_point() + geom_line() +scale_color_manual(values=jcols, name='sub clade') + theme_bw(base_size=16) + facet_grid(.~., scales='free_y')  + labs(y='Abundance', x='Date Sampled') + theme(panel.spacing = unit(0.02, "cm"))  # scale_x_continuous(breaks=seq(1,12,1),labels=c("J", "F","M", "A", "M", "J", "J", "A", "S", "O", "N", "D"))
+pnsi
+
+```
+
+
+
+
+
+
+```{r, fig.width=8, fig.height=6}
+
+library(gridExtra)
+myplot<-grid.arrange(pnsi, pphb, pmai, ncol=1)
+
+ggsave(myplot, filename='~/star.take6.pdf', width=12, height=9)
+```
+
+
+
+```{r, fig.height=1.5, fig.width=6}
+pmai<-ggplot() + geom_bar(data=mai.test.g %>%  filter(!is.na(abunds), tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=as.numeric(month) , y= abunds, fill=fct_lump(tax.subclade, 20)),stat='identity')  +scale_fill_manual(values=jcols, name='sub clade')+ theme_bw(base_size=16) + facet_grid(.~year, scales='free_y')  + labs(y='Abundance', x='Month') + theme(panel.spacing = unit(0.02, "cm"))  + scale_x_continuous(breaks=seq(1,12,1),labels=c("J", "F","M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) +geom_point(data=contextual.long %>%  filter(nrs_location_code_voyage_code %in% c('NSI'), depth_m==0), aes(x=as.numeric(month) , y= `temperature_ctd_its-90,_deg_c`*1000, color=`temperature_ctd_its-90,_deg_c`)) + scale_color_gradientn(colours = oceColorsTemperature(100), name='Temp (˚C)')
+
+
+pmai
+
+
+pphb<-ggplot() + geom_bar(data=phb.test.g %>%  filter(!is.na(abunds), tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=as.numeric(month) , y= abunds, fill=fct_lump(tax.subclade, 20)), stat='identity')  +scale_fill_manual(values=jcols, name='sub clade') +  theme_bw(base_size=16) + facet_grid(.~year, scales='free_y')  + labs(y='Abundance', x='Month') + theme(panel.spacing = unit(0.02, "cm"))  + scale_x_continuous(breaks=seq(1,12,1),labels=c("J", "F","M", "A", "M", "J", "J", "A", "S", "O", "N", "D")) + geom_point(data=contextual.long %>%  filter(nrs_location_code_voyage_code %in% c('PHB'), depth_m==0), aes(x=as.numeric(month) , y= `temperature_ctd_its-90,_deg_c`*2000, color=`temperature_ctd_its-90,_deg_c`)) + scale_color_gradientn(colours = oceColorsTemperature(100), name='Temp (˚C)')
+pphb
+
+
+
+pnsi<-ggplot() + geom_bar(data=nsi.test.g %>%  filter( tax.subclade %in% c('HLII', 'Ia', 'IVa', 'LLI', 'IIh', 'IIe', 'II'),nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=as.numeric(month) , y= abunds, fill=fct_lump(tax.subclade, 20)), stat='identity')  +scale_fill_manual(values=jcols, name='sub clade') + theme_bw(base_size=16) + facet_grid(.~year, scales='free_y')  + labs(y='Abundance', x='Month') + theme(panel.spacing = unit(0.02, "cm"))  + scale_x_continuous(breaks=seq(1,12,1),labels=c("J", "F","M", "A", "M", "J", "J", "A", "S", "O", "N", "D"))+ geom_point(data=contextual.long %>%  filter(nrs_location_code_voyage_code %in% c('NSI'), depth_m==0), aes(x=as.numeric(month) , y= `temperature_ctd_its-90,_deg_c`*3000, color=`temperature_ctd_its-90,_deg_c`), stat='identity' ) + scale_color_gradientn(colours = oceColorsTemperature(100), name='Temp (˚C)')
+pnsi
+
+```
+
+```{r, fig.height=1.5,fig.width=6}
+
+mtemp<-ggplot(data=contextual.long %>%  filter(nrs_location_code_voyage_code %in% c('MAI'), depth_m==0), aes(x=as.numeric(month) , y= `temperature_ctd_its-90,_deg_c`, color=), stat='identity') + geom_point() + geom_smooth() +scale_color_manual(values=mycol12,name='location') + theme_bw(base_size=16) + facet_grid(.~ year)  + labs(y='Surface Temp (˚C)', x='Month') + theme(panel.spacing = unit(0.02, "cm"))  + scale_x_continuous(breaks=seq(1,12,1),labels=c("J", "F","M", "A", "M", "J", "J", "A", "S", "O", "N", "D"))
+
+
+mtemp
+
+
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.subclade),tax.subclade %in% pros, depth_m %in% c(0), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=depth_fac , y= count, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_color_manual(values=jcols, name='Prochlorococcus clade') + theme_bw() + facet_grid(month.abb~ nrs_location_code_voyage_code, ) + coord_flip() + labs(x='depth (m)', y='relative abundance') + theme(panel.spacing = unit(0.02, "cm"))
+```
+
+```{r, fig.width=6}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.subclade), depth_m %in% c(0, 10, 20, 25,30,40,50,75), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=depth_fac , y= count, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols, name='Cyanobacteria sub clade') + theme_bw() + facet_grid(month.abb~ nrs_location_code_voyage_code, ) + coord_flip() + labs(x='depth (m)', y='relative abundance') + theme(panel.spacing = unit(0.02, "cm")) + theme(axis.text.x=element_text(angle = 45, hjust = 1)) +   scale_y_continuous(labels = scales::comma) + theme(strip.text.y = element_text(angle=0)) +scale_x_discrete(breaks=c(0,25, 50))
+
+ggsave('~/SynProDepthProfiles.pdf', width=9, height=8)
+```
+
+
+```{r}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.subclade), depth_m %in% c(0, 10, 20, 25,30,40,50,75), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=depth_fac , y= count, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols) + theme_bw() + facet_grid(month.abb~ nrs_location_code_voyage_code, ) + coord_flip() + labs(x='depth (m)', y='relative abundance (/20000)') + theme(panel.spacing = unit(0.02, "cm"))
+```
+
+
+
+```{r, fig.width=6}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.subclade), depth_m %in% c(0, 30), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON')), aes(x=month.abb , y= count, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols, name='Cyanobacteria sub clade') + theme_bw() + facet_grid(nrs_location_code_voyage_code ~ year, scales='free_y')  + labs(x='month', y='relative abundance') + theme(panel.spacing = unit(0.02, "cm")) + theme(axis.text.x=element_text(angle = 45, hjust = 1)) +   scale_y_continuous(labels = scales::comma) + theme(strip.text.y = element_text(angle=0))
+
+table(cyanobact.cont$tax.subclade)
+jcols
+```
+
+
+
+
+```{r, fig.width=8}
+ggplot() + geom_bar(data=cyanobact.cont %>%  filter(!is.na(tax.subclade), depth_m %in% c(0, 30), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON')), aes(x=month.abb , y= count, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols, name='Cyanobacteria sub clade') + theme_bw() + facet_grid(nrs_location_code_voyage_code ~ year, scales='free_y')  + labs(x='month', y='relative abundance') + theme(panel.spacing = unit(0.02, "cm")) + theme(axis.text.x=element_text(angle = 45, hjust = 1)) +   scale_y_continuous(labels = scales::comma) + scale_x_discrete(breaks=c('J', 'F', 'M','A','M', 'J')) + theme(strip.text.y = element_text(angle=0))
+
+ggsave('~/ProSynTSfreey.pdf', width = 10)
+```
+
+```{r}
+
+bac.nrs
+
+cyano<- bac.nrs %>% filter(Family %in% c("f__Cyanobacteriaceae" ,"f__Cyanobiaceae"))
+
+
+ggplot() + geom_bar(data=cyano, aes(x=as.factor(code), y= abund, fill=fct_lump(Genus, 20)), stat='identity')
+
+ggplot() + geom_bar(data=cyano %>%  filter(!is.na(tax.subclade),!tax.subclade %in% pros, depth_m %in% c(0, 10, 20, 25,30,40,50,75), nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')), aes(x=depth_fac , y= count, fill=fct_lump(tax.subclade, 20)), stat='identity') + scale_fill_manual(values=jcols, name='Synechococcus sub clade') + theme_bw() + facet_grid(month.abb~ nrs_location_code_voyage_code, ) + coord_flip() + labs(y='depth (m)', x='relative abundance (/20000)') + theme(panel.spacing = unit(0.02, "cm"))
+
+```
+
+
+
+```{r}
+cya.seqs<- pel %>% filter (tax.Class =='c__Cyanobacteriia')
+
+cya.clades <- assignTaxonomy(seqs=cya.seqs$zOTU, refFasta='~/Dropbox/arb/cyano.gtdb.assihgn.taxonomy.draft.1.fasta', tryRC=T, minBoot = 50, outputBootstraps = T, multithread = T)
+
+cya.clades <- assignSpecies(seqs=cya.seqs$zOTU, refFasta='~/Dropbox/arb/cyano.gtdb.assihgn.taxonomy.draft.1.fasta', tryRC=T, allowMultiple = T)
+cya.clades <- as.data.frame(cya.clades)
+cya.clades$zOTU <- rownames(cya.clades)
+rownames(cya.clades) <- NULL
+
+table(cya.clades$tax.NA.1)
+
+cya.clades[is.na(cya.clades)]<-'unassigned'
+
+cya.clades <- cya.clades %>% left_join (pel, 'zOTU')
+
+colnames(cya.clades)
+
+cya.clades %>% filter(!is.na(Species)) %>% select(Species, abund)
+
+total <- sum(cya.clades %>% filter(!is.na(Species)) %>% select(abund))/sum(cya.clades %>% filter(is.na(Species)) %>% select(abund))
+
+write_csv(cya.clades %>% arrange(desc(abund)), 'cyano.second.pass.csv')
+
+
+```
+
+
+
+
+
+
+
+
+
+
+```{r, fig.width=5}
+  library(scales)
+scientific_10 <- function(x) {
+  parse(text=gsub("e", " %*% 10^", scales::scientific_format()(x)))
+}
+
+
+options(scipen=10000)
+ggplot() + theme(panel.spacing = unit(0.02, "cm")) +                                                                                                              theme_bw(base_size=14) +                                                                                                                                        
+geom_bar(data=site_totals_gather %>% filter(!tax.subclade %in% c('HLII', 'LLI'), nrs_code %in% c('MAI',  'PHB', 'NSI')), aes(x=month-0.2  , y= prop*synCells, fill=tax.subclade), stat='identity', position='stack', width=0.4) + labs( x='Month') + theme(panel.spacing = unit(0.02, "cm")) + 
+geom_bar(data=site_totals_gather %>% filter(tax.subclade %in% c('HLII', 'LLI'),nrs_code %in% c('MAI', 'PHB', 'NSI')), aes(x=month+0.2  , y= prop*proCells, fill=tax.subclade), stat='identity', position='stack', width=0.4) + labs(y=bquote('Abundance (cells' ~ml^-1*')'))+ facet_grid(nrs_code ~ .) +                                scale_fill_manual(values=jcols, name='Cyanobacteria sub clade') + theme_bw() + scale_y_continuous(label= function(x) {ifelse(x==0, "0", parse(text=gsub("[+]", "", gsub("e", " %*% 10^", scientific_format()(x)))))} ) + scale_x_continuous(breaks=seq(1,12,1),labels=c("J","F","M","A","M","J","J","A","S","O","N","D"))
+
+#bquote('Assimilation ('*mu~ 'mol' ~CO[2]~ m^-2~s^-1*')'))
+
+ggsave('~/synpro_sseasonalbar2.pdf', width=7, height=5)
+
+
+ggsave('~/synpro_sseasonalbar.pdf', width=7, height=5)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

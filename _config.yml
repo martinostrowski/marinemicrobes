@@ -1,5 +1,5 @@
 
-theme: jekyll-theme-minimal
+theme: jekyll-theme-slate
 
 :root {
   --base-font-size: 10px;

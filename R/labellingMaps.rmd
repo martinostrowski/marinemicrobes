@@ -1,0 +1,101 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+IN19v03 data overview for pre-selection of metagenome sequences
+
+1. get DNA sample metadata
+
+2. get nutrient metadata
+
+3. plot overview and write a narrative
+
+4. set some goals
+
+
+```{r}
+library(oce)
+library(tidyverse)
+library(ggrepel)
+library(oce)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(rgeos)
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+
+
+nutrient<-read_csv('~/Dropbox/voyages/IN2019_V03/in2019_v03HydroDep.csv')
+
+nutrient$depth_fac<-factor(round(nutrient$Pressure/20,0)*20, levels=rev(sort(unique(factor(round(nutrient$Pressure/20,0)*20)))))
+```
+
+
+
+
+```{r, fig.height=5}
+ggplot() + geom_point(data=nutrient %>% filter(Pressure <250), aes(x=Longitude+2/(Pressure), y=Latitude, size=1/(Pressure), color=`Temperature (degC)`)) + scale_fill_gradientn(colors=oceColors9A(1000)) + theme_bw()  + geom_sf(data = world, lwd=0.1, fill='lightgreen') + 
+  coord_sf(xlim = c(100, 140), ylim=c(-48,-5)) +geom_label_repel(nudge_x=c(2,rep(-2,18), 2,2,2,2),segment.alpha = 0.4,label.size = 0.1, data=nutrient %>% distinct(Deployment, .keep_all=T) %>% filter(Deployment %%2==0),aes(y=Latitude, x=Longitude, label=Deployment, fill=`Temperature (degC)`), color='white', segment.color = 'grey80',box.padding = 0.01) 
+```
+
+```{r}
+ggplot() + geom_point(data=nutrient %>% filter(!is.na(`Phosphate (uM)`)), aes(x=Longitude+(20/Pressure), y=Latitude, color=`NOx (uM)`/`Phosphate (uM)`)) + scale_color_gradientn(colors=oceColorsDensity(1000), name='N:P ratio') + theme_bw()  + geom_sf(data = world, lwd=0.1, fill='lightgreen') + 
+      coord_sf(xlim = c(100, 140), ylim=c(-48,-5)) + labs(title='N:P') + geom_label_repel(nudge_x=-4,segment.alpha = 0.4,label.size = 0.1, data=nutrient %>% distinct(Deployment, .keep_all=T) %>% filter(Deployment %%2==0),aes(y=Latitude, x=Longitude, label=Deployment, fill=(`NOx (uM)`/`Phosphate (uM)`)), box.padding = 0.01)+ scale_fill_gradientn(colors=oceColorsPhase(1000), name='N:P ratio')
+```
+
+
+```{r, fig.width=7}
+ggplot() + geom_sf(data = world, lwd=0.1, fill='lightgreen') + 
+  coord_sf(xlim = c(100, 140), ylim=c(-48,-5))+
+  geom_point(data=nutrient %>% filter(!is.na(`Oxygen (uM)`)), aes(x=Longitude+10/(Pressure), y=Latitude, size=2/(Pressure), color=`Oxygen (uM)`)) + scale_color_gradientn(colors=oceColorsTemperature(1000))  + theme_bw()  + geom_label_repel(nudge_x=-2,segment.alpha = 0.4,label.size = 0.1, data=nutrient %>% distinct(Deployment, .keep_all=T)%>% filter(Deployment %%2==0),aes(y=Latitude, x=Longitude, label=Deployment), box.padding = 0.01)  
+```
+
+```{r, fig.width=6}
+ggplot() + geom_point(data=nutrient %>% filter(!is.na(`Silicate (uM)`)), aes(x=Longitude+2/(Pressure), y=Latitude, size=1/(Pressure), color=`Silicate (uM)`)) + scale_color_gradientn(colors=oceColorsDensity(1000)) + theme_bw() + geom_sf(data = world, lwd=0.1, fill='lightgreen') + 
+  coord_sf(xlim = c(100, 140), ylim=c(-48,-5)) + geom_label_repel(segment.alpha = 0.4,label.size = 0.1, data=nutrient %>% distinct(Deployment, .keep_all=T),aes(y=Latitude, x=Longitude, label=Deployment), box.padding = 0.4) 
+```
+
+```{r, fig.width=6}
+ggplot() + geom_point(data=nutrient %>% filter(!is.na(`Ammonia (uM)`)), aes(x=Longitude+5/(Pressure), y=Latitude, size=20/(Pressure), color=`Ammonia (uM)`)) + scale_color_gradientn(colors=oceColorsDensity(1000)) + theme_bw() +geom_sf(data = world, lwd=0.1, fill='lightgreen') + 
+  coord_sf(xlim = c(100, 140), ylim=c(-48,-5)) + geom_text_repel(data=nutrient %>% distinct(Deployment, .keep_all=T),aes(y=Latitude, x=Longitude, label=Deployment)) 
+```
+
+
+```{r, fig.width=7}
+ggplot() + geom_point(data=nutrient %>% filter(!is.na(`Phosphate (uM)`)), aes(x=Longitude+2/(Pressure), y=Latitude, size=1/(Pressure), color=`Phosphate (uM)`)) + scale_color_gradientn(colors=oceColorsDensity(1000)) + theme_bw()  +geom_sf(data = world, lwd=0.1, fill='lightgreen') + 
+  coord_sf(xlim = c(100, 140), ylim=c(-48,-5)) + geom_text_repel(data=nutrient %>% distinct(Deployment, .keep_all=T),aes(y=Latitude, x=Longitude, label=Deployment)) 
+
+```
+
+
+
+
+```{r, fig.width=4}
+po4<-ggplot() + geom_point(data=nutrient %>% filter(Pressure < 500, !is.na("Phosphate (uM)")), aes(y=Pressure, x=Latitude, size=1/(Pressure), color=`Phosphate (uM)`)) + geom_point(aes(x=-40, y=-150), alpha=0)+ scale_color_gradientn(colors=oceColorsDensity(1000)) + theme_bw() + scale_y_reverse() + geom_label_repel(nudge_y=20, ylim=c(-30,500),segment.alpha = 0.4,label.size = 0.1, data=nutrient %>% distinct(Deployment, .keep_all=T)%>% filter(Deployment %%2==0),aes(y=0, x=Latitude, label=Deployment), box.padding = 0.4) 
+
+po4
+```
+
+```{r, fig.width=4}
+nox<-ggplot() + geom_point(data=nutrient %>% filter(Pressure < 500, !is.na(`NOx (uM)`)), aes(y=Pressure, x=Latitude, size=100/(Pressure), color=`NOx (uM)`)) + geom_point(aes(x=-40, y=-150), alpha=0)+ scale_color_gradientn(colors=oceColorsDensity(1000)) + theme_bw() + scale_y_reverse() + geom_label_repel(nudge_y=20, ylim=c(-30,500),segment.alpha = 0.4,label.size = 0.1, data=nutrient %>% distinct(Deployment, .keep_all=T)%>% filter(Deployment %%2==0),aes(y=0, x=Latitude, label=Deployment), box.padding = 0.4) 
+  
+
+nox
+```
+
+```{r}
+temp<-ggplot() + geom_point(data=nutrient %>% filter(Pressure < 200), aes(y=Pressure, x=Latitude, size=1/(Pressure), color=`Temperature (degC)`)) + scale_color_gradientn(colors=oceColorsTemperature(1000)) + theme_bw()  + geom_point(aes(x=-10,y=-40), alpha=0) + geom_label_repel(nudge_y=30,box.padding = 0.1,force = 2, data=nutrient %>% distinct(Deployment, .keep_all=T) %>% filter(Deployment %%2==0),aes(x=Latitude, y=0, label=Deployment, fill=Latitude), segment.color = 'black', segment.alpha=0.4,color='white',show.legend = T) + scale_y_reverse()
+
+temp
+
+
+```
+
+

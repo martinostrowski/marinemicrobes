@@ -23,6 +23,7 @@
 
 # Additional routines
 
+16. [Labelling maps](./R/labellingMaps.rmd)
 10. [Spatial mapping SST, Chl](./GettingStartedwithSatelliteDara.Rmd)
 11. PAR
 12. Cyano Reference Database

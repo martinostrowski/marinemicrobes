@@ -15,6 +15,6 @@ By comparing these outputs of these three analyses workflows we should be able t
 
 
 1. 18S Coastal Primary Analysis pipeline
-1. [16S Primary Analysis pipeline](./16s/do-dada2f.1.r)
+1. [16S Primary Analysis pipeline](./16S/do-dada2f.1.r)
 1. [18S Pelagic Primary Analysis pipeline](./18s/do-dada2f.1.r)
 1. [A16S Pelagic Primary Analysis pipeline](./a16s/do-dada2f.1.r)

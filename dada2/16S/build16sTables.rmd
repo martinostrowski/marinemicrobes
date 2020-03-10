@@ -1,0 +1,394 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+## Build a unified ASV table from multiple independent Illumina runs 
+
+What are we trying to do? (We are trying to  combine multiple independent sequencing runs and analyse them in a consistent and reproducible analysis workflow with details for quality control at each stage)
+
+In this example below we combine ASV tables produced from a reanalysis of the raw fastq file from the AMI pelagic marine dataset using the (standard DADA2 pipeline)[anna's, dada2, noah's] and an addtioinal independent data set (from the RV Investigator transit IN2016t02 [Hobart to Sydney]) to demonstrate how other researchers can directly integrate additional datasets to compare directly with the AMI data.
+
+### Processsing steps
+
+1. Collect the ASV tables to combine in one directory
+2. Read-in, gather(convert from wide to long format) and then combine
+3. Summarise the de-replicated ASV table
+4. Additional filtering
+5. Transfer existing zOTU names to 100% matches
+6. Create csvs for the wide and long tables, ASV reference list and phyloseq object for further analyses
+
+
+
+### 1. The current selection of ASV tables are held on the UTS HPCC under hpc:/shared/c3/bio_db/BPA/ampliconDada2/16s
+
+
+```{r}
+#install.packages('BiodiversityR')
+library(tidyverse)
+library(vegan)
+library(reshape2)
+library(BiodiversityR)
+library(DT)
+```
+
+```{r}
+
+sequence_data<-read_csv('mm-genomics-amplicon.csv')
+
+sequence_data <-sequence_data %>% separate(Title, c(NA, 'B'), sep='/')
+
+sequence_data <-sequence_data %>% separate(B, c('code', 'plate'), sep=' ')
+
+
+write.csv(unique(sequence_data$plate[!sequence_data$code %in% pelagicBcodes]), quote=F, row.names=F)
+
+plate_summary<-as.data.frame.matrix(table(sequence_data$plate, sequence_data$nrs_location_code_voyage_code))
+
+datatable(plate_summary)
+```
+
+
+
+
+### 2. Import the list of tables
+
+```{r}
+
+setwd('~/db/uniques/DaDa2/pelagic16s/components/')
+
+asvtables16s<-list.files(pattern='ASV.')
+
+asvs16s.list<-list('vector', length(asvtables16s))
+
+asvs16s.list <- lapply( asvtables16s, function(x) read_csv(x))
+
+#asvtables16s[29][]<-read_csv('~/db/Martin Ostrowski/benchmarking/pelagic16S/IN16t02.exports/ASV.IN16t02.table.csv')
+
+names(asvs16s.list)
+
+```
+
+### 3. Gather, Bind, Summarise and write tables
+
+```{r}
+
+asvs16s.gather<-list('vector', length(asvtables16s)) #length(asvtables16s)
+
+for (i in seq_along(asvs16s.list)){
+  
+  asvs16s.gather[[i]]<- asvs16s.list[[i]] %>% gather(key='code', value='abund', -'X1')
+
+}
+
+pelagicB<-bind_rows(asvs16s.gather[], .id = "column_label")
+
+pelagicB<- pelagicB %>% dplyr::filter(abund !=0)
+
+colnames(pelagicB)[2]<-'ASV'
+
+summary(pelagicB)
+
+paste("The total number of samples represented in this data set is: ", length(unique(pelagicB$code)), sep="")
+
+#write_csv(pelagicB,'pelagicBtableLong20200310.csv')
+```
+
+We were expecting ~4,700 samples which we can cross reference against the complete metadata file. 
+
+
+### 4. Summarise the dereplicated ASV table (and export for taxonomic assignment)
+
+a. plot a rank abundance curve on the en, e.g using vegan functions
+
+```{r}
+#pelagicB<-read_csv('~/db/uniques/DaDa2/pelagic16s/pelagicBtableLong202003.csv')
+
+#pelagicB.ASV<- read_csv('~/db/uniques/DaDa2/pelagic16s/pelagicB.references.csv')
+```
+
+
+### Summary  
+DaDa2 yields for each plate
+
+plate,run,truncl,truncr,yield
+AFGB7,1,260,230,46.34588
+AH55W,2,260,230,36.37
+AHG5R,3,260,230,33.57
+AHG65,4,260,230,36.96755
+AHG7M,5,260,230,37.99433
+AHGA0,6,260,230,44.21733
+AHGA1,7,260,230,39.89041
+AL0YY,8,260,230,NA
+AL1HY,9,260,230,NA
+APE54,10,260,230,38.17
+AT785,11,260,230,NA
+ATNUK,12,260,230,NA
+AW0LM,13,260,230,35.57
+AYBH6,14,260,230,NA
+AYP5R,15,260,230,NA
+B2BRT,16,260,230,NA
+B8R63,17,260,230,NA
+B9YMG,18,260,230,NA
+BB2NF,19,260,230,23.47
+BGJC6,20,260,230,47.94243
+BGTGD,21,260,230,44.58617
+BGTGR,22,260,230,44.56887
+BH4MB,23,260,230,33.10131
+BHBF2,24,260,230,37.88241
+BHBH3,25,260,230,45.05542
+BHBJF,26,260,230,38.17241
+BJT7M,27,260,230,39.96873
+IN16t02,28,260,230,Inf
+AL0YY,29,260,230,41.63129
+AHGA1,30,260,230,39.89041
+ATNUK,31,260,230,36.0682
+AW0LM,32,260,230,42.5551
+B8R63,33,260,230,43.55845
+AUWLK,34,260,230,
+AW0AY,35,260,230,44.82311
+AYBVB,36,260,230,44.65151
+AYP3F,37,260,230,16.1231
+BJTVW,38,260,230,41.89582
+BD892,39,260,230,35.74133
+BGCP2,40,260,230,35.2992
+BC3BP,41,260,230,33.55618
+BH3R2,42,260,230,41.83303
+BGJBR,43,260,230,25.55326
+BD86W,44,260,230,41.537
+BJTVJ,45,260,230,45.78589
+BJT7H,46,260,230,39.04102
+BJT87,47,260,230,28.3024
+BH3PP,48,260,230,7.032928
+B6FJD,49,260,230.46.99252
+BJT3V,50,260,230,34.97998
+BMTJN,51,260,230,62.59556
+BPVL5,52,260,230,50.47313
+BPM3L,53,260,230,45.82424
+C3VFP,54,260,230,33.63635
+C5PBC,55,260,230,32.42328
+C7NP7,56,260,230,32.42328
+INVE03,57,260,230,20.11901
+
+
+
+```{r}
+pelagicB.ASV<- pelagicB %>% group_by(ASV) %>% summarise(total=sum(abund))
+
+
+ra.temp<- as.data.frame(pelagicB.ASV$total)
+rownames(ra.temp)<-pelagicB.ASV$ASV
+
+
+ra.data<-rankabundance(t(ra.temp))
+
+rankabunplot(ra.data, scale='logabun', addit=FALSE, specnames=NA, 
+    srt=45, cex=0.2)
+
+write_csv(pelagicB.ASV,'pelagicB.references.csv') # 
+
+```
+
+This is the table we'll use for the [taxonomic classification](github link) against the  ([Silva 132]())
+
+
+b. Filter out the dud samples (ones that thawed, ones that have < X sequences according to pre-defined standards), decide on filter fpor short sequences (Summarise what was lost in case there was something interesting, and important)
+
+
+
+```{r}
+
+#duds<- read_csv('dudlist.csv')
+
+duds<- c("34256","34257","34258","34259","34260","34261",
+"34262","34263","34264","34265","34266","34267","34274","34275","34276","34277","34278",
+"34279","21970","21971","21972","21973","21974","21975","27426","27427","27429","27430",
+"27431","27428","35259","35260","35261","35262","35263","35264","35265","35266","35267",
+"35268","35269","35270","34828","34829","35249","35250","35251","35252","35253","35254",
+"35255","35256","35257","35258")
+
+pelagicB.clean <- pelagicB %>% dplyr::filter(!code %in% duds)
+
+paste("There are currently ", length(duds), " dud samples in the dataset.", sep ="")
+paste("There are currently ", length(unique(pelagicB.clean$code)), " samples remaining in the dataset.", sep ="")
+
+#ggplot(rankabund[1:100,]) + geom_bar(aes(x=reorder(seq, desc(total)), y=total), stat='identity') + coord_flip()  +theme_bw() +theme(axis.text.y = element_blank())
+
+#rankabund<- pelagicB %>% group_by(ASV, code) %>% summarise(total=sum(abund))
+
+pelagicBsummary <- pelagicB.clean %>% dplyr::group_by(code) %>% summarise(sampleT=sum(abund))
+
+```
+
+[1] "There are currently 54 dud samples in the dataset. That is really sad :-("
+[1] "There are currently 4618 samples remaining in the dataset."
+
+Filter out sequences < 400 nt 
+Filter out Mitochondrial sequencces
+
+
+
+*The conversion to a wide format table is computationally slow, The rarefaction curves can be processed one sample at a time so it is a better idea to process those stats 
+
+
+
+```{r}
+ggplot()+ geom_density(data=pelagicB.ASV, aes(x=nchar(pelagicB.ASV$ASV), height=total, stat=(..density..)) ) + theme_bw()
+
+pelagicB.clean.400<- pelagicB.clean %>% dplyr::filter(nchar(ASV) > 400)
+
+sum(pelagicB.clean.400$abund)/sum(pelagicB.clean$abund)
+
+write_csv(pelagicB.clean.400,'~/db/uniques/DaDa2/pelagic16s/pelagicBtableLongClean400.20200310.csv')
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+Samples <- unique(pelagicB.clean.400$code)
+nSamples<-length(Samples)
+
+
+out <- vector('list', length=nSamples)
+
+pelagicB.clean.df <- as.data.frame(pelagicB.clean.400[,3:4])
+#rownames(pelagicB.clean.df)<-pelagicB.clean[,2]
+  
+  temp<- split(pelagicB.clean.400, as.factor(pelagicB.clean.400$code))
+  Bsn<-vector(length=length(out))
+  codes<-vector(length=length(out))
+  
+
+  #for (i in seq_along(temp)){
+for (i in seq_along(temp)){
+  tempdf<-temp[[i]][,4]
+  #rownames(tempdf)<-temp[[i]]$ASV
+  out[[i]] <-rarecurve(t(tempdf), step =20)
+  names(out)[i]<-unique(temp[[i]]$code)
+  Bsn[i] <- sum(tempdf)
+}
+
+  Bsl<-vector(length=length(out))
+    Bsl1k<-vector(length=length(out)) 
+  
+  
+for (i in seq_along(out)){
+Bsl[i] <-  min(which(diff(out[[i]][[1]]/20) < 0.02))*20
+Bsl1k[i] <-  min(which(diff(out[[i]][[1]]/20) < 0.002))*20
+}
+  
+  hist(Bsl/Bsn)
+  
+
+  summary(Bsn)
+  summary(Bsl)
+  summary(Bsl1k)
+  summary(Bsn < 4020)
+  summary(Bsn < 8100)
+  summary(Bsn < 20000)
+  summary(Bsn < 32080)
+```
+
+
+Find the missing plates and add them to the analyses
+
+```{r}
+unoiseB<- read_csv('~/Downloads/AustralianMicrobiome-2020-03-05T081717-csv/Bacteria.csv')
+
+unoiseB <- unoiseB %>% separate(`Sample ID`, c(NA,'code'), sep='/', remove=T)
+
+unoiseB <- unoiseB %>%  dplyr::filter(!code %in% duds)
+
+unoiseBcodes<- unique(unoiseB$code)
+
+pelagicBcodes <- unique(pelagicB.clean.400$code)
+
+missing_data<-unique(contextual.long$code[!contextual.long$code %in% pelagicBcodes])
+
+sum(pelagicB.clean.400$abund)
+
+summary(contextual.long %>% filter(code %in% missing_data))
+
+```
+***
+
+The next parts of this markdown document will deal with
+1. splitting the dataset so that is manageable for a standard laptop
+2. joining the data with the metadata and refining the taxonomic assignments
+
+
+As a working example, I am going to split NSI, PHB and MAI along with IN16t02, IN16v04
+
+```{r}
+#wanted <- c("NSI","PHB", "MAI",'IN16v04', 'IN16t02')
+
+#wantedCodes<- contextual.long$code[contextual.long$nrs_location_code_voyage_code %in% wanted]
+
+#pelagicBEast<-pelagicB.clean.400 %>%  dplyr::filter(code %in% wantedCodes)
+
+#pelagicBEast<- pelagicBEast %>% left_join(contextual.long, 'code')
+
+#pelagicBEast.ASV<- pelagicBEast %>% group_by(ASV) %>% summarise(total=sum(abund))
+
+#pelagicBEast.ASV<- pelagicBEast.ASV %>% left_join(unoiseB, c ('ASV'='OTU')
+                                                  
+                                                  
+pelagicBcont<- pelagicB %>% left_join(contextual.long, 'code')
+
+pelagicBcont.ASV<- pelagicBcont %>% group_by(ASV) %>% summarise(total=sum(abund))
+
+pelagicBcont.ASV<- pelagicBcont.ASV %>% left_join(unoiseB, c ('ASV'='OTU'))
+
+```
+
+
+
+```{r}
+
+library(dada2)
+
+pelagicBcont.ASV <- pelagicBcont.ASV %>% distinct(ASV, .keep_all=TRUE)
+
+pelagicBcont.ASV <- pelagicBcont.ASV  %>% arrange(desc(total))
+
+write_csv(pelagicBcont.ASV, 'pelagicB.references.20200309.csv')
+```
+
+```{r}
+top1000Missing<- pelagicBcont.ASV  %>%  dplyr::filter(is.na(Order))
+
+top1000Missingtax<-assignTaxonomy(seqs=top1000Missing$ASV[1:500], refFasta = '~/db/Martin Ostrowski/arb/silva_nr_v132_train_set.fa', minBoot = 25, outputBootstraps = T, multithread = T)
+
+top1000Missingtaxdf <- as.data.frame(top1000Missingtax)
+
+top1000Missingtaxdf$ASV<-rownames(top1000Missingtaxdf)
+
+table(top1000Missingtaxdf$tax.Order)
+
+top1000Missing <- top1000Missing %>%  left_join(top1000Missingtaxdf, 'ASV')
+
+top1000Missing %>% dplyr::filter(tax.Order != 'Rickettsiales') %>% summarise(sus=sum(total))
+
+3508908/sum(pelagicBcont$abund)
+
+```
+
+
+```{r}
+
+unoiseB.ASV<- unoiseB %>% group_by(OTU) %>% summarise(unoiseT=sum(`OTU Count`))
+
+combined<- pelagicB.clean.400 %>% full_join(unoiseB.ASV, c('ASV' = 'OTU'))
+
+combined$total <- ifelse(is.na(combined$abund), 1 , combined$abund)
+
+#combined$total <- ifelse(combined$abund)== 0, 1, combined$abund)
+
+combined$unoiseT <- ifelse(is.na(combined$unoiseT), 1, combined$unoiseT)
+
+p1<-ggplot() + geom_point(data=combined %>% dplyr::filter(ASV %in% names(mycol1000)), aes(x=unoiseT, y=as.numeric(total), alpha=0.2, color=ASV, size=abund)) + scale_y_log10() + scale_x_log10() +  geom_abline(slope=1, intercept=0, color='red') + theme_bw() + theme(legend.position='none') + scale_color_manual(values=mycol1000) + geom_abline(aes(slope=1, intercept=-3),color='blue') + geom_label_repel(aes(x=100000000, y=100000, label="y = x-3"), color='blue') + labs(title='Top 1000 (no Ricketsiales) DaDa2 versus Unoise marine dataset total abundance', y='DaDa2 abundance')

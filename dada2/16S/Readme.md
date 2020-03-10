@@ -5,3 +5,4 @@
 2. combine the output ASV tables
 3. each table can be rarefied from the original input list for direct comparison
 4. identify key differences 
+5. make general recommendations for QC

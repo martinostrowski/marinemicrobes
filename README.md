@@ -7,7 +7,7 @@
 3. [Assembling sequence variant tables](./dada2)
 4. [Taxonomic assignment using DADA2](./dada2)
 5. Comparison between methods 
-6. Ecological Statistics
+6. Preparation (./)
 7. Ordination, visualisation and presentation
 8. Community Thermal Index
 9. [Boosted Regression Tree Modelling](../../BRT_2018)
@@ -33,6 +33,7 @@
 
 # Publications
 
+* [Marine Matters](./STAR/Marine_Matters_IN19v03_map.Rmd)
 * [STAR](./misc/STAR/star.md)
 * [Sydney Harbour](./R)
 * [Data Science 2018](./R)

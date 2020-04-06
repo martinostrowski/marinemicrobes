@@ -1,0 +1,488 @@
+---
+title: "State of Australia's Marine Microbial Communities: 2019"
+output: html_notebook
+---
+
+
+### Author: Martin Ostrowski
+#### Contact: martin.ostrowski@uts.edu.au
+#
+#  This is an R notebook providing details of the data and code for the analyses presented
+#  in the State and Trends Report for Australia's Oceans and Seas. The examples set out here
+#  provide a guide for accessing processed Bacterial 16S, Archaeal 16S and Eukaryote 18S
+#  amplicon sequencing data  from the Australian Microbiome Initiative, either directly 
+#  from the portal or by contacting a participant who is working on a curated set of data 
+#  (which might be more suitable for the analyses you are interested in).
+#  A purpose of the Microbial submission was to highlight how time-series data on microbial
+#  taxa might be used as informative indicators in the context of the highly dynamic coastal 
+#  seas and oceans flanking the Australian continent.
+# 
+
+
+1. Load the contextual data and plot a map and time series of the samples collected for 'pelagic' and 'coastal' datasets
+2. Load the processed amplicon table 
+3. Plot alpha and beta-diversity for the National Reference Station Time Series
+4. Time series plots for specific taxonomic ranks
+
+
+# IMOS 2020 STAR  ========================================================================
+# Code associated with state of Australia's microbial communities
+# Figure 1: Map ==========================================================================
+
+# Libraries ------------------------------------------------------------------------------
+
+```{r}
+
+library(tidyverse)
+library(viridisLite)
+library(ggrepel)
+library(oce)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(rgeos)
+library(ggrepel)
+library(cowplot)
+library(ggnewscale)
+
+```
+
+# Variables ------------------------------------------------------------------------------
+
+```{r}
+sitecols<-c("#706622", "#a87c43", "#ab6247", "#90e2b1", "#a9a159", "#d0cd82", "#ffb08b", "#974977","#01a3d8", "#6b599c", "#ff9a9a", "#ffe293","#00a481", "#885a16", 
+"#eaffa2", "#caa9ff","#01f7f5", "#ab403d", "#01dec4", "#816900", "#ffa268", "#6c7200", "#0191ec", "#ff95e4", "#95ffae", "#ff758c", "#fdff8d", "#019954", 
+"#ff7b6f", "#af3e21", "#527d00", "#00963a", "#ba8d00", "#ffc54a", "#ffed60", "#b2ff7d", "#408e00", "#d58800", "#cf0166", "#ff51a8", "#8aaa00", "#ff6dda",
+ "#ebff66", "#00a83c", "#c3ff68", "#67ff8c", "#ba0194", "#fffa4e", "#ea0054", "#ffb00d", "#ef7600", "#baca00", "#00d661", "#015ae4", "#ff3f46", "#9c2dbd",
+  "#d2ff4b", "#00c638", "#ff3ed0", "#ff5316", "#7fd200", "#4bc000", "#9f5dff", "#a7f000", "#4af142", "#c832e8")
+
+nrs = c("KAI","MAI","PHB","ROT","NSI","YON","DAR")
+
+coastal = c("inshore reef_Geoffrey Bay", "inshore reef_Pioneer Bay", "inshore reef_Channel", "Geoffrey Bay", "Channel", "Pioneer Bay", "Centaur Reef", "Wreck Rock", "Lilli Pilli", "Bare Island", "Taren Point", "Cobbler Beach", "Salmon Haul", "Middle Head",  "Balls Head", "Cobblers Beach")
+
+
+```
+
+Additional colors used in this workbook are located at the end of this script
+
+
+# Load data ------------------------------------------------------------------------------
+
+```{r}
+
+world <- ne_countries(scale = "Medium", returnclass = "sf")
+class(world)
+
+# Load the current complete amplicon table for Bacteria (16S) + Eukaryotes (18S)
+
+pelB <- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/pelagic16s/pelagicBLongGTtax.20200328.csv')
+
+pelB<- pelB %>% filter(uniqcode  %in% c(nrs, coastal))
+
+write_csv(pelB, '/Volumes/Dropbox/MarineMicrobes Dropbox/Martin Ostrowski/bact.star/Bacterial_16S.csv')
+  
+pelE <- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/pelagic18s/MarineASV18SPR2taxLong20200401.csv')
+
+pelE <- pelE %>% filter(uniqcode %in% c(nrs, coastal))
+
+write_csv(pelE, '/Volumes/Dropbox/MarineMicrobes Dropbox/Martin Ostrowski/bact.star/Eukaryote_18S.csv')
+
+pelA <- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/pelagicA16s/MarineA16sLongTax20200329.csv')
+
+pelA <- pelA %>% filter(uniqcode %in% c(nrs, coastal))
+
+write_csv(pelE, '/Volumes/Dropbox/MarineMicrobes Dropbox/Martin Ostrowski/bact.star/Acheae_A16S.csv')
+
+cyanocols<- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/Martin Ostrowski/Carbon content paper/data/cyanocols.csv')
+
+
+```
+
+## CONTEXTUAL DATA ##
+# ======================================================================================
+#  Create a simple localised map of Reference Stations and sampling sites. Display a plot 
+#  that temporal ans spatial context for the microbial time series. The example dataset 
+#  provided  includes a subset of the metadata. 
+#  
+#  Original Sources
+#  -----------------------------
+#  MNF voyages: CSIRO Data Trawler
+#  NRS Data: AODN
+#  Amplicon Sequences: NCBI BIOPROJECTNUMBER
+#  Metadata: Australian Microbiome Initiative Portal
+#  -----------------------------
+#
+#  The current set of contextual data was processed downloaded from the AMI portal 
+#  and processed (metadataImport.Rmd) : 2020-April-25-00:00-UTC
+# 
+#  source: https://data.bioplatforms.com/organization/australian-microbiome
+# ======================================================================================
+# Visualise sampling sites on a map
+
+## SPATIAL EXTENT OF SAMPLES ##
+
+```{r, fig.width=7, fig.height=7}
+
+contextual.long <-read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/meta/contextualLong.20200328.csv')
+
+meta <- contextual.long %>% filter (uniqcode %in% c(nrs,coastal))
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+class(world)
+
+sites<- meta[!duplicated(meta$uniqcode),]
+
+sitecols<-c("#706622", "#a87c43", "#ab6247", "#90e2b1", "#a9a159", "#d0cd82", "#ffb08b", "#974977","#01a3d8", "#6b599c", "#ff9a9a", "#ffe293","#00a481", "#885a16", 
+"#eaffa2", "#caa9ff","#01f7f5", "#ab403d", "#01dec4", "#816900", "#ffa268", "#6c7200", "#0191ec", "#ff95e4", "#95ffae", "#ff758c", "#fdff8d", "#019954", 
+"#ff7b6f", "#af3e21", "#527d00", "#00963a", "#ba8d00", "#ffc54a", "#ffed60", "#b2ff7d", "#408e00", "#d58800", "#cf0166", "#ff51a8", "#8aaa00", "#ff6dda",
+ "#ebff66", "#00a83c", "#c3ff68", "#67ff8c", "#ba0194", "#fffa4e", "#ea0054", "#ffb00d", "#ef7600", "#baca00", "#00d661", "#015ae4", "#ff3f46", "#9c2dbd",
+  "#d2ff4b", "#00c638", "#ff3ed0", "#ff5316", "#7fd200", "#4bc000", "#9f5dff", "#a7f000", "#4af142", "#c832e8")
+
+names(sitecols)<-unique(meta$uniqcode) # creating a named vector of colors for the sample sites
+                        
+
+ggplot(meta )+  geom_sf(data = world, lwd=0.1, fill='#cd5133') + 
+  coord_sf( ylim=c(-48,-5))+ coord_sf(xli=c(110,160), ylim=c(-48, -10), expand=F) +
+  theme_bw(base_size=12) + 
+  #guides(color=guide_legend( ncol=2, override.aes = list(size=5)), size='none') +
+  geom_point( aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, color=uniqcode), alpha=0.7, size=4)+
+  labs(y='Latitide', x='Longitude', title="Sampling sites of the Marine Microbes and Australian Microbiome Initiative") +
+  scale_color_manual(values=sitecols, name="Sample Site")+
+  geom_label_repel(data=sites %>% distinct (uniqcode, .keep_all = T), 
+                   aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, label=uniqcode, size=9),
+                   nudge_x=5,box.padding = 0.1, 
+                   label.padding = 0.15, 
+                   arrow=arrow(angle=30,length= unit(0.05,'cm'),type='open'), segment.size = 0.2)+
+  theme(panel.background = element_rect(fill = "#cef8ff", colour = NA)) + theme(legend.position='none')
+ 
+
+ggsave('~/AMMBI_MM_samplemap.png', dpi=900, width=8)
+```
+
+## TEMPORAL EXTENT OF SAMPLES
+
+```{r, fig.width=9, fig.height=7}
+meta$depth_f <- factor(meta$depth_m, levels = rev(sort(unique(meta$depth_m))))
+levels (meta$depth_f) <- rev(sort(unique(meta$depth_f)))
+
+
+ggplot() +  
+  geom_tile(data=meta,
+             aes(x=date_sampled, y=depth_f, fill=uniqcode), lwd=2)+
+  labs(y='Depth (m)', x='Date Sampled', title="Timeline of Sampling") +
+  scale_fill_manual(values=sitecols, name="Sample Site")+
+  facet_grid(sample_type ~ ., scale='free_y', space='free') +
+  #geom_label_repel(nudge_x = 0.5, data=sites, aes(x=date_sampled, y=00, label=uniqcode, size=0.2), label.size = 0.2)+
+  theme(strip.text.y = element_text(angle = 0)) +
+  theme_bw(base_size=8) + 
+  guides(color=guide_legend( ncol=1)) 
+
+#ggsave('~/Timeline_of_sampling.png', width=10)
+```
+
+## MICROBIAL COMMUNITIES AT IMOS NRS ##
+# ======================================================================================
+#  Create simple relative abundance plot of the dominant Bacterial, Phytoplankton,  
+#  Eukaryote and Archaeal species based on amplicon abundance at the IMOS NRS microbial 
+#  time series. The example dataset provided includes a subset of the metadata. 
+#  
+#  Original Sources
+#  -----------------------------
+#  NRS Data: AODN
+#  Amplicon Sequences: NCBI BIOPROJECTNUMBER
+#  Metadata: Australian Microbiome Initiative Portal
+#  Microbial abundance:
+#  Bacterial and Archaeal taxonomic classification: GTDB
+#  Eukaryote taxonomic classification: PR2.12
+#  -----------------------------
+#
+#  The current set of contextual data was processed downloaded from the AMI portal 
+#  and processed (metadataImport.Rmd) : 2020-April-25-00:00-UTC
+# 
+#  source: https://data.bioplatforms.com/organization/australian-microbiome
+# ======================================================================================
+# Visualise Bacterial abundance and diversity
+
+```{r, fig.width=18, fig.height=10}
+ levels(pelB$tax.Species) <- c(unique(pelB$tax.Species, 'unassigned' ))
+
+ levels(pelB$sample_site) <-c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")
+ 
+ levels(pelB$tax.Family) <- c(unique(pelB$tax.Family, 'unassigned' ))
+ pelB <- pelB %>% unite( 'FG', c(tax.Family,tax.Species), remove=F)
+ pelB$depth_m[pelB$depth_m==0]<-2
+ pelB$depth_f<- cut(pelB$depth_m, c(0,14,40,80,120), labels=c("Surface",  "15 - 39m", "40 - 79m",  "80 - 119m"))
+ #pelB$depth_b<- cut(pelB$bottom_depth, c(0,150, 10000), labels=c("Shelf - Coastal", "Offshore"))
+ 
+ 
+ # creating a named vector of colors with the lumping factor as names (in this case tax.Family joined to tax.Species) will allow us to see the use the 
+ 
+ mycolsB <-rev(as.vector(mycol1000[seq(2,1000, 1000/83)])) 
+ pelB$FG[pelB$FG== 'NA_NA']<-NA
+ legend.namesB <- pelB %>% filter(FG %in% ( fct_lump(FG, 80, w=abund))) %>% select (FG, tax.Family) %>% distinct(FG, .keep_all=T)
+ names(mycolsB) <-legend.namesB$FG
+ other<-'grey80'
+ names(other)='Other'
+
+
+ggplot(pelB %>% filter (uniqcode %in% nrs)) + 
+   geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill') + 
+   scale_fill_manual(values=c(mycolsB, other), name='Bacterial Family and Species (GTDB assignments)') +theme_bw() + theme(legend.position = 'bottom') + 
+   coord_flip() + 
+   facet_grid(sample_site ~ month,, space='free', as.table = T) + 
+   labs(title=' Overview of Bacterial diversity from 16S amplicons. Month x depth at IMOS NRS sites')  + 
+   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.8,"cm")) + 
+   scale_x_discrete(limits=rev(levels(pelB$depth_f))) +
+  scale_y_continuous(expand=c(0,0)) +
+   guides(fill=guide_legend( ncol=4)) 
+
+ggsave('~/NRS_month_by_depth_Bacterial_16s.pdf', height=12, width=18 )
+
+```
+
+
+## PHYTOPLANKTON COMMUNITIES AT NRS ##
+
+
+```{r,fig.width=18, fig.height=10}
+#subset the Eukaryotes for the PR2 definition of Phytoplankton (this includes dropping Dinoflagellates)
+
+phyto<- c('Chlorophyta', 'Cryptophyta', 'Cercozoa', 'Haptophyta', 'Ochrophyta')
+
+pelEp<- pelE %>%  filter(tax.Division %in% phyto)
+
+levels(pelEp$tax.Species) <- c(unique(pelEp$tax.Species, 'unassigned' ))
+
+ levels(pelEp$sample_site) <-c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")
+ 
+ levels(pelEp$tax.Family) <- c(unique(pelE$tax.Family, 'unassigned' ))
+ pelEp <- pelEp %>% unite( 'FG', c(tax.Family,tax.Species), remove=F)
+ pelEp$depth_m[pelEp$depth_m==0]<-2
+ pelEp$depth_f<- cut(pelEp$depth_m, c(0,14,40,80,120), labels=c("Surface",  "15 - 39m", "40 - 79m",  "80 - 119m"))
+ #pelE$depth_b<- cut(pelE$bottom_depth, c(0,150, 10000), labels=c("Shelf - Coastal", "Offshore"))
+ 
+ 
+ # creating a named vector of colors with the lumping factor as names (in this case tax.Family joined to tax.Species) will allow us to see the use the general patterns in diversity over an annual cycle at each IMOS NRS
+ 
+ mycolsE <-rev(as.vector(mycol1000[seq(1,1000, 1000/84)])) 
+ pelEp$FG[pelEp$FG== 'NA_NA']<-NA
+ legend.namesE <- pelEp %>% filter(FG %in% ( fct_lump(FG, 80, w=abund))) %>% select (FG, tax.Family) %>% distinct(FG, .keep_all=T)
+ names(mycolsE) <-legend.namesE$FG
+ other<-'grey80'
+ names(other)='Other'
+
+
+ggplot(pelEp %>% filter (uniqcode %in% nrs)) + 
+   geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill') + 
+   scale_fill_manual(values=c(mycolsE, other), name='Phytoplankton Family and Species') +theme_bw() + theme(legend.position = 'bottom') + 
+   coord_flip() + 
+   facet_grid(sample_site ~ month,, space='free', as.table = T) + 
+   labs(title=' Overview of Phytoplankton diversity from 18S amplicons. Month x depth at IMOS NRS sites')  + 
+   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.8,"cm")) + 
+   scale_x_discrete(limits=rev(levels(pelEp$depth_f))) +
+  scale_y_continuous(expand=c(0,0)) +
+   guides(fill=guide_legend( ncol=4)) 
+
+ggsave('~/NRS_month_by_depth_Eukaryote_18s.pdf', height=12, width=18 )
+
+```
+
+## Dinoflagellates ##
+
+```{r,fig.width=18, fig.height=10}
+#subset the Eukaryotes for the PR2 Dinoflagellates
+
+
+pelEd<- pelE %>%  filter(tax.Division == 'Dinoflagellata')
+
+levels(pelEd$tax.Species) <- c(unique(pelEd$tax.Species, 'unassigned' ))
+
+ levels(pelEd$sample_site) <-c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")
+ 
+ levels(pelEd$tax.Family) <- c(unique(pelEd$tax.Family, 'unassigned' ))
+ pelEd <- pelEd %>% unite( 'FG', c(tax.Family,tax.Species), remove=F)
+ pelEd$depth_m[pelEd$depth_m==0]<-2
+ pelEd$depth_f<- cut(pelEd$depth_m, c(0,14,40,80,120), labels=c("Surface",  "15 - 39m", "40 - 79m",  "80 - 119m"))
+ #pelE$depth_b<- cut(pelE$bottom_depth, c(0,150, 10000), labels=c("Shelf - Coastal", "Offshore"))
+ 
+ 
+ # creating a named vector of colors with the lumping factor as names (in this case tax.Family joined to tax.Species) will allow us to see the use the general patterns in diversity over an annual cycle at each IMOS NRS
+ 
+ mycolsEd <-rev(as.vector(mycol1000[seq(7,1000, 1000/84)])) 
+ pelEd$FG[pelEd$FG== 'NA_NA']<-NA
+ legend.namesEd <- pelEd %>% filter(FG %in% ( fct_lump(FG, 80, w=abund))) %>% select (FG, tax.Family) %>% distinct(FG, .keep_all=T)
+ names(mycolsEd) <-legend.namesEd$FG
+ other<-'grey80'
+ names(other)='Other'
+
+
+ggplot(pelEd %>% filter (uniqcode %in% nrs)) + 
+   geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill') + 
+   scale_fill_manual(values=c(mycolsEd, other), name='Dinoflagellate Family and Species') +theme_bw() + theme(legend.position = 'bottom') + 
+   coord_flip() + 
+   facet_grid(sample_site ~ month,, space='free', as.table = T) + 
+   labs(title=' Overview of Dinoflagellate diversity from 18S amplicons. Month x depth at IMOS NRS sites')  + 
+   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.8,"cm")) + 
+   scale_x_discrete(limits=rev(levels(pelEd$depth_f))) +
+  scale_y_continuous(expand=c(0,0)) +
+   guides(fill=guide_legend( ncol=4)) 
+
+ggsave('~/NRS_month_by_depth_Dinoflagellate_18s.pdf', height=12, width=18 )
+```
+
+## CLUSTERING MOLECULAR DATA FROM NRS TIME SERIES ##
+# ======================================================================================
+#  Create simple ordination plot of the dominant Bacterial, Phytoplankton,  
+#  Eukaryote and Archaeal species based on amplicon abundance at the IMOS NRS microbial 
+#  time series. The example dataset provided includes a subset of the metadata. 
+#  
+#  Original Sources
+#  -----------------------------
+#  NRS Data: AODN
+#  Amplicon Sequences: NCBI BIOPROJECTNUMBER
+#  Metadata: Australian Microbiome Initiative Portal
+#  Microbial abundance:
+#  Microbial taxonomic classification: GTDB
+#  -----------------------------
+#
+#  The current set of contextual data was processed downloaded from the AMI portal 
+#  and processed (metadataImport.Rmd) : 2020-April-25-00:00-UTC
+# 
+#  source: https://data.bioplatforms.com/organization/australian-microbiome
+# ======================================================================================
+# Visualise Ordination and Clustering
+
+*************************************************************************************
+
+
+
+not yet completed
+
+```{r}
+
+clusters.df2<-readRDS('~/Dropbox/zOTUs/bioregions.1/nrs.1000simprof.rds')
+clusters.df2<-readRDS('~/Dropbox/zOTUs/bioregions.1/top.1000.mm.for.modelling.csv')
+
+clusters.df <- clusters.df %>% separate(rowname, c(NA, 'code'), sep='/', remove=T)
+
+mycol12<-c("#fdb0d2","#00896f","#fcb973","#7e367b","#982c16","#11e19c","#b9ab00","#5a51d7","#52d656","#c93801","#f660de","#ff66a2")
+clusters.df$code <- as.numeric(clusters.df$code)
+clusters.df <- clusters.df %>% left_join(contextual.long, 'code')
+
+clusters.df$depth_fac<-factor(clusters.df$depth_m, levels=rev(sort(unique(clusters.df$depth_m))))
+
+clusters.df$nrs_location_code_voyage_code <- factor(clusters.df$nrs_location_code_voyage_code, levels=rev(c('MAI', 'PHB', 'NSI', 'YON', 'ROT', 'KAI', 'DAR')))
+
+ggplot() + geom_tile(data=clusters.df %>%  filter( nrs_location_code_voyage_code %in% c('MAI', 'PHB', 'NSI')), aes(x=date_sampled , y= depth_fac, fill=as.factor(mycl1000.1000)), stat='identity', width=30) + 
+  scale_fill_manual(values=mycol12, name='Cluster') + 
+  theme_bw(base_size=12) + facet_grid(nrs_location_code_voyage_code ~ ., scales='free')  + 
+  labs(x='Date Sampled', y='Depth (m)') + theme(panel.spacing = unit(0.1, "cm")) + theme(axis.text.x=element_text(angle =0, hjust = 1))  + theme(strip.text.y = element_text(angle=0)) + scale_y_discrete(limits=levels(clusters.df$depth_m))
+
+
+ggsave('~/star_figure_1b.pdf', width=6, height=3.5)
+
+
+
+
+mycol1000<-c("#5e521c","#0e6011","#64428c","#82395f","#8c287a","#9b0878","#2e5d1e","#74490b","#53552a","#385c04",
+"#9d1263","#88374d","#a50a38","#a11d13","#6c4d04","#293cd5","#a00b5d","#264f9f","#415a19","#87355e",
+"#734649","#634e43","#195298","#56550e","#a80322","#6a3d93","#365c19","#3e37d4","#0e5a6d","#474b94",
+"#903141","#862c83","#43583d","#6e3e87","#784441","#6e389b","#3d5661","#6e4565","#a01c2f","#9002a0",
+"#843373","#8e3530","#a1163f","#49526b","#a11e02","#7a2ca1","#711dc7","#3d5758","#245a5f","#833c47",
+"#9b2147","#644870","#3d5183","#453ec0","#574e6a","#592fcc","#9c0f6d","#47582e","#2b5d2b","#784536",
+"#6b4c31","#345c25","#8f1e87","#085d54","#0d5e45","#83400c","#8a2f6c","#165d4c","#664e34","#9d1c4c",
+"#544d77","#6d4c20","#7e3386","#455464","#95078f","#7a4059","#6a4a4f","#5d3ab1","#7a3b74","#943022",
+"#5144a3","#2a5679","#4f39c3","#8203be","#a11050","#6a36a8","#9c223b","#873d11","#7825b2","#81402e",
+"#8a3456","#952853","#4d5726","#156005","#7f27a1","#585337","#3a5a3c","#8418ac","#774449","#275582",
+"#a60c2a","#813c54","#912a61","#8a3a21","#7a4527","#754453","#714a25","#4b4f7c","#5e3fa2","#7c3d64",
+"#912c59","#962d2c","#4d489a","#6b437a","#3b537b","#6e4c17","#3e4e92","#76463b","#804217","#664a5f",
+"#2c5e06","#4034d9","#285d37","#8e1598","#7e367d","#7a424c","#84317c","#9b2819","#843f1f","#3c5474",
+"#a5150e","#1a5490","#4d5808","#225e32","#6e446e","#8917a3","#0f6021","#8b3929","#235b5a","#6930b8",
+"#7b3195","#883944","#385b35","#624e4d","#773f6d","#2f5868","#9e222a","#80403c","#505541","#933036",
+"#3d5947","#982d11","#61503b","#0042d3","#a80c04","#8e01a8","#5b5410","#5a478d","#991e63","#5c4e62",
+"#614780","#255c4f","#144ead","#8f3711","#64502a","#1b4cb2","#75339e","#1d5972","#733e7f","#415b08",
+"#524f73","#2848ba","#634d56","#931d80","#8b383c","#872791","#4842b6","#315c3e","#335a54","#5f4b71",
+"#8a00b3","#9b0085","#1f5f2d","#345b47","#574b82","#635126","#7b461f","#8800b8","#522ed8","#8d3b00",
+"#635300","#015b78","#0154a1","#7a4a00","#5b5700","#004ac8","#7c14cc","#2f6100","#af0010","#ae0032",
+"#006062","#005d80","#af0038","#7421d2","#0044df","#014fc3","#005c8c","#ab0063","#006621","#01599f",
+"#b00047","#ab006c","#396300","#af0059","#005e8a","#005c96","#6f29d7","#006643","#8612cd","#a70085",
+"#9300be","#303fe7","#6c5700","#b20053","#486200","#983e00","#006375","#884b00","#00692c","#0046eb",
+"#596000","#006b05","#0052d0","#af007f","#b10077","#934700","#006c12","#a9009b","#0258c2","#006c36",
+"#695e00","#a600ab","#0150df","#646000","#bf000c","#825500","#b72400","#ba0063","#005fb2","#be0048",
+"#00668e","#904f00","#7334e1","#006a73","#c0003e","#bb006c","#b42e00","#5641eb","#00702d","#b03500",
+"#016986","#c50015","#c4002e","#006e5d","#aa3e00","#7f5b00","#4d6b00","#2b7000","#a300cc","#00704f",
+"#7b5e00","#007144","#c70021","#c30055","#b400a1","#c80300","#b7009a","#ae00b9","#00724a","#723be8",
+"#0265b2","#0058e4","#0053f3","#935500","#bc0090","#01706e","#0165b8","#007519","#a84700","#494bf5",
+"#ad00c8","#016f85","#377300","#0065c0","#0169ad","#c02e00","#00745b","#c1008d","#72635c","#016e94",
+"#5f6d00","#a34f00","#8835e5","#ce0045","#8e5d00","#ce004b","#cd0058","#d2000e","#00756b","#0065cf",
+"#d10037","#0261e1","#cd016b","#7b6800","#cf0060","#d40027","#9e2bdf","#0162e6","#b800cb","#007779",
+"#017b49","#5a7400","#007d00","#2e7b00","#0171ad","#b94800","#007788","#d60059","#916400","#017697",
+"#8642f1","#0172b5","#0160fd","#c100c8","#0269e1","#d50179","#01802b","#d8006a","#db1800","#417d00",
+"#7b7000","#d80073","#c600c1","#d32f00","#df0900","#325eff","#5158ff","#0264f9","#537b00","#d40092",
+"#de0054","#0172c8","#aa30e4","#d80085","#017d85","#e20033","#d50099","#677900","#00841c","#00833f",
+"#d9008d","#9f6500","#a86000","#7c6e77","#008503","#936c00","#008267","#c84900","#737800","#d700a4",
+"#b15d00","#ca00d2","#027ca7","#9944f4","#0073dd","#ea0005","#00855b","#d24200","#0079c4","#8e7200",
+"#018748","#e90049","#e90054","#c05700","#d700bd","#cf4a00","#857700","#017faf","#0073ec","#914dfd",
+"#0179d4","#018679","#f00012","#6661ff","#ef003d","#286eff","#de00b4","#0083a5","#5a8500","#028595",
+"#c05d00","#4a8800","#f2002f","#b86300","#f10145","#e6009a","#c32fe5","#ec007e","#008e20","#b240f2",
+"#027be2","#855bff","#0574ff","#018c6b","#f00076","#ea3300","#3c8d00","#ee008b","#01902d","#007af0",
+"#de05d4","#028c8a","#818200","#c13bee","#0185c2","#0089a7","#0087ba","#4275ff","#f20097","#fc0047",
+"#f80072","#ec00b6","#f000a5","#ae7300","#0184d6","#d729e2","#009089","#648d00","#f80188","#9a7e00",
+"#d232e8","#0087d0","#6871ff","#8b65ff","#9a5eff","#009096","#bd47f9","#019469","#009725","#ff1058",
+"#0185e4","#019381","#a957ff","#329600","#806cff","#01965b","#ac7a00","#f200c1","#e325df","#ff2a25",
+"#a57f00","#ff2d1c","#009948","#00967e","#0192a8","#f300cd","#009b14","#b456ff","#ff295f","#ff2f43",
+"#a85fff","#ff2376","#019b43","#ff3335","#ff1b8b","#f110d6","#ff2280","#8c8b00","#ff149b","#409a00",
+"#ff3354","#7d9000","#f34d00","#8872ff","#ff3072","#ff3d21","#009d59","#ff18ad","#ff3765","#df6500",
+"#2d87ff","#0292d5","#5c9a00","#d37000","#0294ca","#5883ff","#998c00","#0199a9","#ff4538","#4787ff",
+"#b18500","#ff4926","#6d82ff","#ff3f83","#ff36a2","#cc55ff","#ff3d8f","#ff4472","#0193e8","#bf61ff",
+"#ff4b50","#01a17d","#0290fc","#7b9900","#a770ff","#f431e6","#ff2dc8","#ff26d4","#de4afc","#01a18f",
+"#0097e1","#01a46b","#00a645","#ff4f68","#e07200","#ff534a","#ff3cb9","#d07d00","#739e00","#ff572d",
+"#02a29f","#917fff","#f06800","#e946f8","#01a0bc","#ff4d99","#ff585a","#ff5b47","#d95aff","#b175ff",
+"#3ea900","#7a8aff","#ff587a","#f76800","#ff5b65","#ff4db1","#ff42d1","#00ad2b","#ff5790","#00a6aa",
+"#61a700","#cb6aff","#ff4dbf","#9e9a00","#ff5a8a","#b17aff","#f348f9","#02a3cc","#ff6519","#18ae35",
+"#ff6533","#00a99f","#ff59a5","#ff41ed","#ac9800","#ba9300","#8fa100","#00a4d8","#00b049","#7991ff",
+"#00ad85","#01af69","#7ba700","#00b20e","#4d9aff","#ff4be5","#ff6672","#cb8e00","#7095ff","#ff4bec",
+"#00b32b","#ae83ff","#01b07b","#4cb000","#01ae9a","#c579ff","#d88a00","#ff678e","#ff5bc9","#00b35d",
+"#00b503","#f05aff","#ff5fbc","#02a3fb","#a48aff","#ff65a6","#e68400","#ff713c","#9490ff","#da6fff",
+"#00b197","#23a3ff","#02a6f6","#ff716c","#ff7355","#c99600","#ff7172","#4ea1ff","#bb9c00","#2ab700",
+"#ff762b","#02aae7","#ff5de2","#01add3","#01b492","#ff6ab3","#769cff","#02aaee","#f48100","#5db400",
+"#8d97ff","#ff7851","#f661ff","#00b0cc","#8cad00","#ff7864","#ff71a3","#ff6bc6","#ff7495","#6da1ff",
+"#75b300","#ff7784","#ff5ff7","#ff67dd","#a7a0ae","#cf82ff","#f06cff","#c787ff","#00b6b6","#ec8d00",
+"#b29fa3","#31abff","#ff74b3","#00bd59","#dd9600","#a796ff","#bf8dff","#ff8061","#9e9aff","#ff832f",
+"#00b2ef","#ff77be","#b5a900","#c1a500","#ff817b","#66a9ff","#ff7f90","#ff7bae","#00b8ca","#00c144",
+"#f274ff","#dc83ff","#01c06d","#ff72e4","#ff809a","#91a2ff","#01c079","#ff78cd","#ff8a13","#ff8853",
+"#01bdbb","#ff8961","#02bfa6","#61aeff","#ec9800","#de9f00","#ff7ec8","#ff8c40","#ff8976","#02b9eb",
+"#01c567","#afb200","#ff8896","#de8bff","#ff8f52","#ff9129","#f281ff","#ff89a3","#afa1ff","#80bf00",
+"#ff7bf3","#ff8d87","#ff9319","#ff85c8","#dba600","#00bee3","#01c952","#ff8d95","#9cbb00","#ff7cfb",
+"#ff9440","#bfb200","#69c500","#ff81eb","#ff9531","#01bdf6","#c49dff","#ff936f","#0ccc0b","#f088ff",
+"#00c7a0","#a4a9ff","#00c993","#5fb8ff","#3abcff","#ff87e4","#87b2ff","#ff90b1","#daac00","#02c5d1",
+"#a9bd00","#01cf38","#ff8fc6","#b8a7ff","#ff91bd","#de98ff","#9cb0ff","#ff988a","#01d12c","#ff89f7",
+"#72baff","#ee92ff","#ff9c67","#c3a6ff","#01cf80","#01c7e0","#fa8cff","#ffa028","#ff97b3","#ffa038",
+"#d2b500","#50d000","#01d090","#ff9b9e","#c4bb00","#e29dff","#00d364","#c0abff","#9dc600","#ff9ba9",
+"#bebe00","#ff95da","#28d51c","#ff9ac0","#8ccb00","#4ad400","#02ced0","#a0b8ff","#00d0c2","#01cde0",
+"#ffa737","#ffa664","#ffa485","#2ec9ff","#ffa674","#ffa39d","#fd96ff","#5dc6ff","#01d4a9","#ff9cd8",
+"#01d68d","#99bdff","#ffa95c","#ff9be6","#ffa68d","#e8a3ff","#9bcd00","#00cdfc","#00d974","#dbbc00",
+"#ffa3bb","#ffab56","#ffa798","#ffa2cf","#00dc49","#00d4d1","#ffae2e","#f79fff","#bfc700","#d9aeff",
+"#ffa7b7","#8dc4ff","#d3b1ff","#ffb03c","#01d3fb","#ffa8cd","#70ccff","#01d7df","#ffb085","#ffb264",
+"#cdb7ff","#ffaf98","#ffa3ff","#01e15f","#e6afff","#00dcbd","#c7bbff","#ffb37d","#a0c6ff","#abc4ff",
+"#01e180","#ffaec2","#ffb815","#ffa9eb","#ffb1ab","#99d3a6","#eab6dc","#eeb2ed","#7ad0fa","#c9c89d",
+"#72d6cf","#38d9e6","#5ed3ff","#32e096","#9dd39d","#ebbd94","#eac14f","#9bcedb","#d0c0db","#3fe08b",
+"#b6cf84","#bad12e","#21e0a2","#b4d247","#63dab8","#debfb8","#d7c766","#c1c0ff","#e1c193","#a4cdd3",
+"#9cd81b","#40e333","#e8c31a","#7ed1ef","#9cd582","#9bcbf5","#c3c9aa","#d8c2af","#99d2b7","#7ad4da",
+"#c5ce37","#9fd577","#63d5ec","#cacc4e","#d4c94c","#ffb93d","#b7cda1","#a4caee","#61d7dc","#71d4e6",
+"#e2c530","#feb779","#56dda3","#80dd0f","#7fdc54","#ffaed5","#80da82","#a8d37b","#4fd9da","#13d9f5",
+"#f8b6ab","#e4b4ff","#e0c37d","#f3b9a2","#cdc982","#bdce7a","#f6b992","#d1c96a","#b5c7e6","#87dc13",
+"#6add82","#3cddbe","#b1ceaa","#a9c8f6","#91d788","#5ede88","#94d690","#cfc2d0","#a5d0b4","#e6bea6",
+"#84dc3b","#82db68","#8dd2d2","#afcdbc","#dfbae4","#7fd8a7","#dbb9f6","#82d991","#ffb947","#9ed74e",
+"#aad538","#a0cce7","#86ceff","#50ddad","#bec2fa","#4fdcbb","#c4c4dd","#e0bebf","#82d7af","#19e45b",
+"#d8c49b","#60e055","#f1b5d3","#fcb699","#b5cf90","#b5d314","#7cdd48","#f5bd55","#cdbfef","#d5c77d",
+"#d7c683","#b7ce98","#96d940","#ffb2b6","#cacb72","#4de16b","#45df9e","#e1c54f","#4bdbcc","#2ee447",
+"#f8bd2a","#e7c08a","#b6c8de","#c0cba2","#edc05f","#3adfa9","#a9d604","#79da9a","#f6b5c2","#87d5c0",
+"#d8c1c0","#6ae02b","#fbba64","#dcc2a6","#d8c0ca","#b3d179","#dbc755","#bcd05c","#b8d239","#d5c691",
+"#85d1eb","#11e292","#eeb8c7","#f6b0ea","#c4c3e8","#ebb5e9","#e6bad2","#eabcb0","#f2c009","#c1d028",
+"#8fda53","#93ccff","#aed369","#abd461","#9cd845","#f8ba7f","#efbf68","#50df94","#a2d660","#b4cdb3",
+"#cfcc2a","#78d7c5","#d8bcec","#85d6ba","#cacd43","#48e17a","#a8cec8","#dcc821","#f7b4c9","#e3c286",
+"#45d7f8","#e8bbc3","#e8b4f9","#c4cc86","#e8c347","#fdba54","#cac8a7","#ccc991","#68e043","#86d4cf",
+"#cfc5b8","#88da75","#a0d1bb","#58e22e","#f0be76","#e3c461","#60e062","#7bdc75","#f2c01f","#debdd4")
+```

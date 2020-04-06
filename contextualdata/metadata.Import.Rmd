@@ -1,0 +1,261 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+
+```{r}
+install.packages('leaflet')
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+#library(rjson)
+library(jsonlite)
+library(leaflet)
+library(RCurl)
+library(ggridges)
+
+r_birthplace_map <- leaflet() %>%
+  addTiles() %>%  # use the default base map which is OpenStreetMap tiles
+  addMarkers(lng=151.1395, lat=-33.723,
+             popup="Where Martin Lives")
+r_birthplace_map
+
+bma<-read_csv('~/MarineMicrobes Dropbox/uniques/DaDa2/meta/australian-microbiome/package_metadata/base-genomics-amplicon.csv')
+
+spec(bma)
+
+ mma<-read_csv('~/MarineMicrobes Dropbox/uniques/DaDa2/meta/australian-microbiome/package_metadata/mm-genomics-amplicon.csv', col_types=cols(
+  Organization = col_character(),
+  Title = col_character(),
+  Description = col_character(),
+  URL = col_character(),
+  Tags = col_double(),
+  `Geospatial Coverage` = col_character(),
+  License = col_character(),
+  `allo (mg/m3)` = col_double(),
+  `alpha_beta_car (mg/m3)` = col_double(),
+  `ammonium (μmol/l)` = col_double(),
+  amplicon = col_character(),
+  analysis_software_version = col_character(),
+  analytical_platform = col_character(),
+  `anth (mg/m3)` = col_double(),
+  archive_ingestion_date = col_date(format = ""),
+  `asta (mg/m3)` = col_double(),
+  `average_host_abundance (%)` = col_double(),
+  `beta_beta_car (mg/m3)` = col_double(),
+  `beta_epi_car (mg/m3)` = col_double(),
+  `bleaching (%)` = col_double(),
+  bottom_depth = col_double(),
+  `but_fuco (mg/m3)` = col_double(),
+  `cantha (mg/m3)` = col_double(),
+  chlf_ctd = col_double(),
+  `chlorophyll_a (μg/l)` = col_double(),
+  coastal_id = col_character(),
+  comments = col_character(),
+  `conductivity_sm (s/m)` = col_double(),
+  contextual_data_submission_date = col_date(format = ""),
+  `cphl_a (mg/m3)` = col_double(),
+  `cphl_b (mg/m3)` = col_double(),
+  `cphl_c1 (mg/m3)` = col_double(),
+  `cphl_c1c2 (mg/m3)` = col_double(),
+  `cphl_c2 (mg/m3)` = col_double(),
+  `cphl_c3 (mg/m3)` = col_double(),
+  `cphlide_a (mg/m3)` = col_double(),
+  data_generated = col_date(format = ""),
+  data_type = col_character(),
+  dataset_url = col_character(),
+  date_of_transfer = col_skip(),
+  date_sampled = col_date(format = ""),
+  `density_ctd (density, kg/m^3)` = col_double(),
+  `depth (m)` = col_double(),
+  description = col_character(),
+  `diadchr (mg/m3)` = col_double(),
+  `diadino (mg/m3)` = col_double(),
+  `diato (mg/m3)` = col_double(),
+  dilution_used = col_character(),
+  `dino (mg/m3)` = col_double(),
+  `dv_cphl_a (mg/m3)` = col_double(),
+  `dv_cphl_a_and_cphl_a (mg/m3)` = col_double(),
+  `dv_cphl_b (mg/m3)` = col_double(),
+  `dv_cphl_b_and_cphl_b (mg/m3)` = col_double(),
+  `echin (mg/m3)` = col_double(),
+  environment = col_character(),
+  facility = col_character(),
+  `fine_sediment (%)` = col_double(),
+  flow_id = col_character(),
+  `fluorescence (au)` = col_double(),
+  folder_name = col_character(),
+  `fouling (%)` = col_double(),
+  fouling_organisms = col_character(),
+  `fuco (mg/m3)` = col_double(),
+  `geo_loc (country:subregion)` = col_character(),
+  `grazing (%)` = col_double(),
+  grazing_number = col_double(),
+  `gyro (mg/m3)` = col_double(),
+  `hex_fuco (mg/m3)` = col_double(),
+  `host_abundance (individuals per m2)` = col_skip(),
+  `host_abundance_seaweed (mean number ind per m2 +/- se)` = col_skip(),
+  host_species = col_character(),
+  host_state = col_character(),
+  information = col_character(),
+  `inorganic_fraction (mg/l)` = col_double(),
+  `keto_hex_fuco (mg/m3)` = col_double(),
+  `latitude (decimal degrees)` = col_double(),
+  `length (cm)` = col_double(),
+  license_id = col_character(),
+  `light_intensity (lux)` = col_double(),
+  `light_intensity_meadow (µmol/m²/s¯¹)` = col_double(),
+  `light_intensity_surface (µmol/m²/s¯¹)` = col_double(),
+  `longitude (decimal degrees)` = col_double(),
+  `lut (mg/m3)` = col_double(),
+  `lyco (mg/m3)` = col_double(),
+  `mg_dvp (mg/m3)` = col_double(),
+  `microbial_abundance (cells per ml)` = col_double(),
+  mm_amplicon_linkage = col_character(),
+  name = col_character(),
+  ncbi_bioproject_accession = col_character(),
+  ncbi_biosample_accession = col_character(),
+  `neo (mg/m3)` = col_double(),
+  `nitrate_nitrite (μmol/l)` = col_double(),
+  `nitrite (μmol/l)` = col_double(),
+  `no2 (µmol/l)` = col_double(),
+  notes = col_character(),
+  `npic (mg/l)` = col_double(),
+  `npoc (mg/l)` = col_double(),
+  nrs_location_code_voyage_code = col_character(),
+  nrs_sample_code = col_character(),
+  nrs_trip_code = col_character(),
+  omics = col_character(),
+  `organic_fraction (mg/l)` = col_double(),
+  organism = col_character(),
+  `oxygen_ctd_coastal_water (ml/l)` = col_double(),
+  `oxygen_ctd_pelagic (μmol/kg)` = col_double(),
+  `oxygen_lab (μmol/l)` = col_double(),
+  `pam_fluorometer (pam)` = col_double(),
+  pass_fail = col_character(),
+  `perid (mg/m3)` = col_double(),
+  `ph_level (h2o)` = col_double(),
+  `phide_a (mg/m3)` = col_double(),
+  `phosphate (μmol/l)` = col_double(),
+  `phytin_a (mg/m3)` = col_double(),
+  `phytin_b (mg/m3)` = col_double(),
+  `pn (µmol/l)` = col_double(),
+  `poc (µmol/l)` = col_double(),
+  `pras (mg/m3)` = col_double(),
+  pressure_bottle = col_double(),
+  `pyrophide_a (mg/m3)` = col_double(),
+  `pyrophytin_a (mg/m3)` = col_double(),
+  read_length = col_character(),
+  reads = col_double(),
+  `salinity_ctd (psu)` = col_double(),
+  `salinity_lab (psu)` = col_double(),
+  sample_extraction_id = col_character(),
+  sample_id = col_character(),
+  sample_site = col_character(),
+  sample_submission_date = col_skip(),
+  sample_type = col_character(),
+  samplename_depth = col_character(),
+  `secchi_depth (m)` = col_double(),
+  `sedimentation_rate (g /(cm2 x y)` = col_double(),
+  `silicate (μmol/l)` = col_double(),
+  `sio2 (µmol/l)` = col_double(),
+  submitter = col_character(),
+  target = col_character(),
+  `temperature (its-90, deg c)` = col_double(),
+  `temperature_ctd (its-90, deg c)` = col_double(),
+  ticket = col_character(),
+  time_sampled = col_character(),
+  title = col_character(),
+  `total_alkalinity (μmol/kg)` = col_double(),
+  `total_carbon (%)` = col_double(),
+  `total_co2 (μmol/kg)` = col_double(),
+  `total_inorganc_carbon (%)` = col_double(),
+  `total_nitrogen (%)` = col_double(),
+  `total_phosphorous (%)` = col_double(),
+  touching_organisms = col_character(),
+  `transmittance (%)` = col_double(),
+  `tss (mg/l)` = col_double(),
+  `turbidity (upoly 0, wet labs flnturt)` = col_double(),
+  `turbidity_ctd (nephelometric turbidity units)` = col_double(),
+  `viola (mg/m3)` = col_double(),
+  work_order = col_skip(),
+  `zea (mg/m3)` = col_double()))
+
+ 
+contextual.long <- mma
+colnames(contextual.long) <- gsub(" ", "_", colnames(contextual.long), fixed = TRUE) #remove spaces
+colnames(contextual.long) <- gsub("(", "", colnames(contextual.long), fixed = TRUE) #remove brackets
+colnames(contextual.long) <- gsub(")", "", colnames(contextual.long), fixed = TRUE)
+colnames(contextual.long) <- gsub("/", "_per_", colnames(contextual.long), fixed = TRUE)
+colnames(contextual.long) <- tolower(colnames(contextual.long)) #all lowercase
+
+colnames(contextual.long)[colnames(contextual.long)=="temperature_ctd_its-90,_deg_c"]<-'Temp_C'
+
+
+noquote(contextual.long$sample_id)
+contextual.long$code <- noquote(contextual.long$sample_id)
+
+contextual.long$code<-noquote(str_remove(string = contextual.long$code, pattern='102.100.100/'))
+
+contextual.long$date_sampled
+
+contextual.long$date_sampled <- noquote(contextual.long$date_sampled)
+  
+
+contextual.long <- contextual.long %>% separate(date_sampled, c('year','month','day'), sep='-', remove=F) # separate the YYYY-MM-DD format date into year, moth and day
+
+contextual.long$month.abb <- factor(month.abb[as.integer(contextual.long$month)], levels=c(month.abb[seq(1,12,1)])) # add levels from jan to dec
+
+contextual.long$nitrate_nitrite_μmol_per_l[contextual.long$nitrate_nitrite_μmol_per_l == -999.000] <- NA;
+contextual.long$phosphate_μmol_per_l[contextual.long$phosphate_μmol_per_l == -999.000] <- NA;
+contextual.long$salinity_ctd_psu[contextual.long$salinity_ctd_psu == -999.000] <- NA;
+contextual.long$silicate_μmol_per_l[contextual.long$silicate_μmol_per_l == -999.0000] <- NA;
+contextual.long<- contextual.long[contextual.long$salinity_ctd_psu > 2,]
+ 
+
+greenLeafIcon <- makeIcon( "~/Downloads/add-circle.svg",
+  iconWidth = 9, iconHeight = 9
+)
+
+contextual.long$longitude_decimal_degrees <- ifelse(contextual.long$longitude_decimal_degrees < 0, contextual.long$longitude_decimal_degrees +360, contextual.long$longitude_decimal_degrees)
+
+mma<-contextual.long
+bma<-contextual.long
+
+icons <- awesomeIcons(
+  icon = "add-circle-outline",
+  iconColor = 'orange',
+  library = 'ion'
+)
+
+
+mma
+
+contextual.long$latitude_decimal_degrees
+
+rosebay <- leaflet(data=mma %>%  filter (!is.na(latitude_decimal_degrees))) %>%
+  addTiles() %>%  # use the default base map which is OpenStreetMap tiles
+  addLabelOnlyMarkers(~longitude_decimal_degrees, ~latitude_decimal_degrees, icon=icons) %>% 
+    #addMarkers(data=bma,~longitude_decimal_degrees, ~latitude_decimal_degrees, icon=greenLeafIcon) %>% 
+  setView(lng=151.26, lat=-33.865, zoom = 5) 
+rosebay
+
+edit(addMark)
+```
+
+```{r}
+ggplot(contextual.long) + geom_density_ridges(aes(x=date_sampled))
+
+
+colnames(contextual.long)
+```
+
+
+
+```{r}
+spec(mma)
+```
+

@@ -1,0 +1,239 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+# IN2019_v03 ==============================================================================
+# Code associated with student profile in Marine Matters
+# Figure 1: Map ==========================================================================
+
+# Libraries ------------------------------------------------------------------------------
+
+```{r}
+library(rgdal)                # for spTransform() & project()
+library(ncdf4)                # for current data and SST data downloaded from AODN
+library(ggplot2)              # for ggplot()
+library(ggrepel)              # for geom_text_repel() - repel overlapping text labels
+library(data.table)
+library(tidyverse)
+library(oce)                  # for a colorset suitable for oceanography
+library(rnaturalearth)        # for a map
+```
+
+# Variables ------------------------------------------------------------------------------
+
+
+# Load data ------------------------------------------------------------------------------
+
+# Map data
+
+```{r}
+world <- ne_countries(scale = "Medium", returnclass = "sf")
+
+
+# Load environmental table
+# The original source for this data is https://www.cmar.csiro.au/data/trawler/survey_details.cfm?survey=IN2019_V03
+
+in19v03.env<-read_csv('~/Dropbox/voyages/IN2019_V03/in2019_v03HydroDep.csv')
+```
+
+# option to load NRS data
+
+## CURRENT DATA ##
+# ======================================================================================
+# Create a simple localised map of currents based on data from IMOS Ocean Current using ggplot.
+# For this example we selected the 'Gridded sea level anomaly - Delayed mode' product,
+# set a bounding box for the Australian region (lat, lon) and date range covering the duration
+# of the voyage (IN2019_v03) and requested a download in .nc format. This  section of code is  
+# based on a script sourced from the IMOS user code library (https://github.com/aodn/imos-user-code-library/blob/master/R/demos/acorn.R)
+# 
+#  Parameters for this subset
+#  -----------------------------
+#  Collection: IMOS - OceanCurrent - Gridded sea level anomaly - Delayed mode
+#  Spatial: From Lat/Lon -60.0,90.0 to Lat/Lon 90.0,180.0
+#  Temporal: 2019-May-25-00:00-UTC to 2019-Jun-15-00:00-UTC
+# 
+#  source: https://portal.aodn.org.au
+# ======================================================================================
+# Load current data
+
+```{r}
+curr<-nc_open("~/Downloads/IMOS_aggregation_20200402T214601Z/IMOS_aggregation_20200402T214601Z.nc");
+lon <- ncvar_get(curr, 'LONGITUDE')
+lat <- ncvar_get(curr, 'LATITUDE')
+vcur <- ncvar_get(curr, 'VCUR')
+ucur <- ncvar_get(curr, 'UCUR')
+
+## Transform lon and lat objects so that they have the same length as udata and vdata
+
+long <- rep(lon, length(lat))
+lati <- NA
+for (i in 1:length(lat)){
+latitude <- rep(lat[i], length(lon))
+if (i == 1) lati <- latitude else lati <- c(lati, latitude)
+}
+lon_b <- lon; lon <- long
+lat_b <- lat; lat <- lati
+
+vdata<-vcur[,,10]  #northward geostrophic velocity
+udata<-ucur[,,10]  #eastward geostrophic velocity
+dat1 <- list( )
+dat1$x <- c( lon)
+dat1$y <- c( lat)
+
+x1 <- c( lon) + c( udata)/1 # Divide u values by 5 to resize the length of the current directional arrow
+y1 <- c( lat) + c( vdata)/1 # Divide v values by 5 to resize the length of the current directional arrow
+
+## Subsample the current vectors to obtain an appropriate spacing for the scale of the figure
+
+dat2<-dat1
+sub<-seq(1,length(dat1$x),3)
+
+dat2$x <- dat1$x[sub]
+dat2$y <- dat1$y[sub]
+x2<-x1[sub]
+y2<-y1[sub]
+
+# ggplot() + geom_point(data=in19v03.env, aes(x=Longitude, y=Latitide), color='black')
+
+## set your lat and lon ranges here 
+xrange <- c(100,125)
+yrange <- c (-42,-8)
+```
+## Plot a basic map with deployments and currents
+```{r}
+ggplot() + 
+  geom_point(data=in19v03.env, aes(x=Longitude, y=Latitude), color='black') +
+  geom_segment(data=as.data.frame(dat2), aes(x=x, xend=x2, y=y, yend=y2), lwd=0.1, arrow = arrow(type = 'open',length = unit(0.05, "cm"))) + 
+  coord_fixed(1) + 
+  geom_sf(data = world, lwd = 0) + coord_sf(xlim = c(xrange), ylim=c(yrange))+
+  theme_bw() 
+
+
+## Adding labels is relatively straight forward with geom_label_repel
+
+
+ggplot() + 
+  geom_point(data=in19v03.env, aes(x=Longitude, y=Latitude), color='black') +
+  geom_segment(data=as.data.frame(dat2), aes(x=x, xend=x2, y=y, yend=y2), lwd=0.1, arrow = arrow(type = 'open',length = unit(0.05, "cm"))) + 
+  geom_label_repel(nudge_x=-5,segment.alpha = 0.4,label.size = 0.1, data=in19v03.env %>% 
+          distinct(Deployment, .keep_all =T) %>% 
+          filter (round(Latitude,0) %%2==0),aes(y=Latitude, x=Longitude, label=Deployment)) +
+  coord_fixed(1) + 
+  geom_sf(data = world, lwd = 0) + coord_sf(xlim = c(xrange), ylim=c(yrange))+
+  theme_bw() 
+```
+
+
+## SST DATA ##
+# ======================================================================================
+# Create a simple localised map of Sea Surface Temperature based on data from IMOS Ocean Color using ggplot.
+# For this example we selected the 'SRS - SST - L3S - Single Sensor - 6 day - day time - Australia' product,
+# set a bounding box for the Australian region (lat, lon) and date range covering the duration
+# of the voyage (IN2016_v03) and requested a download in .nc format.
+#
+#  Parameters for this subset
+#  -----------------------------
+#  Collection: IMOS - SRS - SST - L3S - Single Sensor - 6 day - day time - Australia
+#  Spatial: From Lat/Lon -60.0,90.0 to Lat/Lon -5.0,180.0
+#  Temporal: 2019-May-25-15:20-UTC to 2019-Jun-15-15:20-UTC
+# 
+# ======================================================================================
+# Load SST data
+```{r}
+sst01<-nc_open("~/Downloads/IMOS_aggregation_20200404T015637Z/IMOS_aggregation_20200404T015637Z.nc");
+
+sst01.d<-ncvar_get(sst01, 'sea_surface_temperature');  ### check the variable name is correct, can be 'sst4', or other names
+#sst01.d[sst01.d > 42.00072]<-NA  ### beware this value should be changed to NA in the matrix
+sst<-sst01.d[,,8]-273.15
+sstlon <- ncvar_get(sst01, 'lon')
+sstlat <- ncvar_get(sst01, 'lat')
+
+## Arrange the data into long format for ggplot
+
+longitude<- rep(sstlon, length(sstlat))
+
+## This loop might take a while and would be improved by converting to an apply function
+latitude  <- NA
+
+for (i in seq_along(sstlat)){
+  latitude <-c(latitude , rep(sstlat[i],length(sstlon)))
+}
+sst=as.vector(sst)
+
+SSTlong<-as.data.frame(cbind(lat=latitude[1:length(sst)], lon=longitude[1:length(sst)], sst=as.vector(sst)))
+
+```
+
+## FINALISING THE MAP  ##
+# ======================================================================================
+# Create a simple regional map with Deployment locations, labels, currents and SST using ggplot.
+# Repel overlapping text labels with ggrepel.
+# Skip ever 2nd deployment to prevent crowding of labels
+# Add axis labels, a title and export to pdf
+# To do: add Marine Park boundaries
+# ======================================================================================
+# Generate the Map
+
+```{r, fig.width=7, fig.height=7, fig.retina=2}
+
+xrange <- c(105,125)
+yrange <- c (-40,-8)
+ggplot() + 
+  geom_tile(data=SSTlong %>% filter(between(lon, 100, 125), between(lat, -42,-8)), aes(x=lon, y=lat, fill=sst)) + 
+        scale_fill_gradientn(colors=oceColors9A(300), na.value = NA, name='Sea Surface Temperature (deg C)') +
+  geom_polygon(data = fortify(my_spdf ), aes( x = long, y = lat, group = group), lwd=0.2, fill="#69b3a2", color="white", alpha=0.3) +
+  geom_segment(data=as.data.frame(dat2), aes(x=x, xend=x2, y=y, yend=y2), lwd=0.1, arrow = arrow(type = 'open',length = unit(0.05, "cm"))) + 
+  geom_point(data=in19v03.env, aes(x=Longitude, y=Latitude), color='black') +
+  geom_label_repel(nudge_x=-2,segment.alpha = 0.4,label.size = 0.1, data=in19v03.env %>% 
+                     distinct(Deployment, .keep_all =T) %>% 
+                     filter (round(Deployment,0) %%2==0),aes(y=Latitude, x=Longitude, label=Deployment), segment.colour = 'black', color='white', fill='black') +
+  labs(title='Overview and oceanographic context of microbial sampling on IN2016_v03', x= 'Longitude (deg E)', y='Latitude (deg N)') +
+  geom_sf(data = world, lwd = 0) + coord_sf(xlim = xrange, ylim=yrange, expand=F)+
+  theme_bw()  
+
+  
+
+
+ggsave('~/Figure_1c_Jet.pdf', height=15, width=9)
+
+```
+
+## MARINE PARKS SHAPE FILES  ##
+# ======================================================================================
+# Add Marine Parks boundaries to the map in order to highlight sampling in the Abrohlos 
+# Marine Park.
+# To do: add Marine Park labels
+# ======================================================================================
+# Generate the Map
+
+
+```{r}
+
+my_spdf <- readOGR( 
+  dsn= "/Volumes/Dropbox/MarineMicrobes Dropbox/Martin Ostrowski/AustralianMarineParksEstate/Shape/" ,
+  verbose=FALSE
+)
+ogrListLayers(dsn= "/Volumes/Dropbox/MarineMicrobes Dropbox/Martin Ostrowski/Dropbox/AustralianMarineParksEstate/Shape/")
+
+
+
+plot(my_spdf, col="#f2f2f2", bg="skyblue", lwd=0.25, border=0 )
+
+install.packages('broom')
+library(broom)
+spdf_fortified <- fortify(my_spdf %>% filter(RESNAME == 'Abrohlos'), region = "AustralianMarineParks")
+
+
+my_spdf
+
+states <- map(my_spdf, plot = FALSE, fill = TRUE)
+head(states)
+```
+
+
+```{r}
+```
+

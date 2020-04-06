@@ -7,7 +7,7 @@
 3. [Assembling sequence variant tables](./dada2)
 4. [Taxonomic assignment using DADA2](./dada2)
 5. Comparison between methods 
-6. Preparation (./)
+6. [Preparation](./STAR/STAR_Microbial_Communities_background.Rmd)
 7. Ordination, visualisation and presentation
 8. Community Thermal Index
 9. [Boosted Regression Tree Modelling](../../BRT_2018)

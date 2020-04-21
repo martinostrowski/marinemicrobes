@@ -1,10 +1,10 @@
 ---
-title: "State of Australia's Marine Microbial Communities: 2019"
+title: "Visualising Australia's Marine Microbial Communities: 2019"
 output: html_notebook
 ---
 
 
-### Author: Martin Ostrowski
+#### Author: Martin Ostrowski
 #### Contact: martin.ostrowski@uts.edu.au
 #
 #  This is an R notebook providing details of the data and code for the analyses presented
@@ -33,17 +33,16 @@ output: html_notebook
 
 ```{r}
 
-library(tidyverse)
-library(viridisLite)
-library(ggrepel)
-library(oce)
-library(sf)
-library(rnaturalearth)
-library(rnaturalearthdata)
-library(rgeos)
-library(ggrepel)
-library(cowplot)
-library(ggnewscale)
+library(tidyverse)           #   
+library(viridisLite)         #    
+library(oce)                 # oceanographic colorschemes
+library(sf)                  #    
+library(rnaturalearth)       # maps
+library(rnaturalearthdata)   # map boundaries
+library(rgeos)               # map projections
+library(ggrepel)             # 
+library(cowplot)             # multiple plots
+library(ggnewscale)          # multiple colorscales
 
 ```
 
@@ -75,13 +74,13 @@ class(world)
 
 # Load the current complete amplicon table for Bacteria (16S) + Eukaryotes (18S)
 
-pelB <- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/pelagic16s/pelagicBLongGTtax.20200328.csv')
+pelB <- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/pelagic16s/pelagicBLongGTtax.20200415.csv')
 
 pelB<- pelB %>% filter(uniqcode  %in% c(nrs, coastal))
 
 write_csv(pelB, '/Volumes/Dropbox/MarineMicrobes Dropbox/Martin Ostrowski/bact.star/Bacterial_16S.csv')
   
-pelE <- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/pelagic18s/MarineASV18SPR2taxLong20200401.csv')
+pelE <- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/pelagic18s/MarineASV18SPR2taxLong20200416.csv')
 
 pelE <- pelE %>% filter(uniqcode %in% c(nrs, coastal))
 
@@ -125,7 +124,7 @@ cyanocols<- read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/Martin Ostrowski/C
 
 contextual.long <-read_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/uniques/DaDa2/meta/contextualLong.20200328.csv')
 
-meta <- contextual.long %>% filter (uniqcode %in% c(nrs,coastal))
+meta <- contextual.long #%>% filter (uniqcode %in% c(nrs,coastal))
 
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
@@ -133,17 +132,11 @@ class(world)
 
 sites<- meta[!duplicated(meta$uniqcode),]
 
-sitecols<-c("#706622", "#a87c43", "#ab6247", "#90e2b1", "#a9a159", "#d0cd82", "#ffb08b", "#974977","#01a3d8", "#6b599c", "#ff9a9a", "#ffe293","#00a481", "#885a16", 
-"#eaffa2", "#caa9ff","#01f7f5", "#ab403d", "#01dec4", "#816900", "#ffa268", "#6c7200", "#0191ec", "#ff95e4", "#95ffae", "#ff758c", "#fdff8d", "#019954", 
-"#ff7b6f", "#af3e21", "#527d00", "#00963a", "#ba8d00", "#ffc54a", "#ffed60", "#b2ff7d", "#408e00", "#d58800", "#cf0166", "#ff51a8", "#8aaa00", "#ff6dda",
- "#ebff66", "#00a83c", "#c3ff68", "#67ff8c", "#ba0194", "#fffa4e", "#ea0054", "#ffb00d", "#ef7600", "#baca00", "#00d661", "#015ae4", "#ff3f46", "#9c2dbd",
-  "#d2ff4b", "#00c638", "#ff3ed0", "#ff5316", "#7fd200", "#4bc000", "#9f5dff", "#a7f000", "#4af142", "#c832e8")
-
 names(sitecols)<-unique(meta$uniqcode) # creating a named vector of colors for the sample sites
                         
 
-ggplot(meta )+  geom_sf(data = world, lwd=0.1, fill='#cd5133') + 
-  coord_sf( ylim=c(-48,-5))+ coord_sf(xli=c(110,160), ylim=c(-48, -10), expand=F) +
+ggplot( meta)+  geom_sf(data = world, lwd=0.1, fill='#cd5133') + 
+  coord_sf( ylim=c(-48,-5))+ coord_sf(xli=c(100,200), ylim=c(-48, -10), expand=F) +
   theme_bw(base_size=12) + 
   #guides(color=guide_legend( ncol=2, override.aes = list(size=5)), size='none') +
   geom_point( aes(x=longitude_decimal_degrees, y=latitude_decimal_degrees, color=uniqcode), alpha=0.7, size=4)+
@@ -157,15 +150,18 @@ ggplot(meta )+  geom_sf(data = world, lwd=0.1, fill='#cd5133') +
   theme(panel.background = element_rect(fill = "#cef8ff", colour = NA)) + theme(legend.position='none')
  
 
-ggsave('~/AMMBI_MM_samplemap.png', dpi=900, width=8)
+ggsave('~/AMMBI_MM_samplemap_overview.png', dpi=300, width=20, height=16)
 ```
 
 ## TEMPORAL EXTENT OF SAMPLES
+
+This creates a timeline of samples faceted by sample_type and with sample_depth as a factor
 
 ```{r, fig.width=9, fig.height=7}
 meta$depth_f <- factor(meta$depth_m, levels = rev(sort(unique(meta$depth_m))))
 levels (meta$depth_f) <- rev(sort(unique(meta$depth_f)))
 
+pelB$sample_site <- factor(pelB$sample_site, levels=rev(c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")))
 
 ggplot() +  
   geom_tile(data=meta,
@@ -207,37 +203,54 @@ ggplot() +
 ```{r, fig.width=18, fig.height=10}
  levels(pelB$tax.Species) <- c(unique(pelB$tax.Species, 'unassigned' ))
 
- levels(pelB$sample_site) <-c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")
- 
  levels(pelB$tax.Family) <- c(unique(pelB$tax.Family, 'unassigned' ))
- pelB <- pelB %>% unite( 'FG', c(tax.Family,tax.Species), remove=F)
+ 
+ pelB <- pelB %>% unite( 'FG', c(tax.Family,tax.Species), remove=F) # create a composite name composed of taxonomic Family and either Genus, Species or ASVid
  pelB$depth_m[pelB$depth_m==0]<-2
- pelB$depth_f<- cut(pelB$depth_m, c(0,14,40,80,120), labels=c("Surface",  "15 - 39m", "40 - 79m",  "80 - 119m"))
+ pelB$depth_f<- cut(pelB$depth_m, c(0,14,40,80,120), labels=c("Surface",  "15 - 39m", "40 - 79m",  "80 - 119m")) # convert depth ranges to factors and provide labels
  #pelB$depth_b<- cut(pelB$bottom_depth, c(0,150, 10000), labels=c("Shelf - Coastal", "Offshore"))
  
  
  # creating a named vector of colors with the lumping factor as names (in this case tax.Family joined to tax.Species) will allow us to see the use the 
  
- mycolsB <-rev(as.vector(mycol1000[seq(2,1000, 1000/83)])) 
+ mycolsB <-rev(as.vector(mycol1000[seq(5,1000, 30)])) 
  pelB$FG[pelB$FG== 'NA_NA']<-NA
- legend.namesB <- pelB %>% filter(FG %in% ( fct_lump(FG, 80, w=abund))) %>% select (FG, tax.Family) %>% distinct(FG, .keep_all=T)
+ legend.namesB <- pelB %>% filter(FG %in% ( fct_lump(FG, 30, w=abund))) %>% select (FG, tax.Family) %>% distinct(FG, .keep_all=T)
  names(mycolsB) <-legend.namesB$FG
  other<-'grey80'
  names(other)='Other'
 
 
 ggplot(pelB %>% filter (uniqcode %in% nrs)) + 
-   geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill') + 
+   geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 30, w=abund)), stat='identity', position='fill') + 
    scale_fill_manual(values=c(mycolsB, other), name='Bacterial Family and Species (GTDB assignments)') +theme_bw() + theme(legend.position = 'bottom') + 
    coord_flip() + 
-   facet_grid(sample_site ~ month,, space='free', as.table = T) + 
+   facet_grid(sample_site ~ month, space='free', as.table = T) + 
    labs(title=' Overview of Bacterial diversity from 16S amplicons. Month x depth at IMOS NRS sites')  + 
    theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.8,"cm")) + 
    scale_x_discrete(limits=rev(levels(pelB$depth_f))) +
   scale_y_continuous(expand=c(0,0)) +
    guides(fill=guide_legend( ncol=4)) 
 
-ggsave('~/NRS_month_by_depth_Bacterial_16s.pdf', height=12, width=18 )
+ggsave('~/NRS_month_by_depth_Bacterial_16s2.pdf', height=12, width=18 )
+```
+
+
+
+
+```{r, fig.width=18, fig.height=10}
+ggplot(pelB %>% filter (uniqcode %in% nrs)) + 
+   geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 30, w=abund)), stat='identity', position='fill') + 
+   scale_fill_manual(values=c(mycolsB, other), name='Bacterial Family and Species (GTDB assignments)') +theme_bw() + theme(legend.position = 'right') + 
+   coord_flip() + 
+   facet_grid(sample_site ~ ., space='free', as.table = T) + 
+   labs(title=' Overview of Bacterial diversity from 16S amplicons x depth at IMOS NRS sites')  + 
+   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.4,"cm")) + 
+   scale_x_discrete(limits=rev(levels(pelB$depth_f))) +
+  scale_y_continuous(expand=c(0,0)) +
+   guides(fill=guide_legend( ncol=1)) 
+
+ggsave('~/NRS_by_depth_Bacterial_16s4.pdf', height=12, width=16 )
 
 ```
 
@@ -252,10 +265,12 @@ phyto<- c('Chlorophyta', 'Cryptophyta', 'Cercozoa', 'Haptophyta', 'Ochrophyta')
 
 pelEp<- pelE %>%  filter(tax.Division %in% phyto)
 
-levels(pelEp$tax.Species) <- c(unique(pelEp$tax.Species, 'unassigned' ))
 
- levels(pelEp$sample_site) <-c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")
- 
+
+pelEp$sample_site <- factor(pelEp$sample_site, levels=rev(c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")))
+
+
+ levels(pelEp$tax.Species) <- c(unique(pelEp$tax.Species, 'unassigned' ))
  levels(pelEp$tax.Family) <- c(unique(pelE$tax.Family, 'unassigned' ))
  pelEp <- pelEp %>% unite( 'FG', c(tax.Family,tax.Species), remove=F)
  pelEp$depth_m[pelEp$depth_m==0]<-2
@@ -275,16 +290,26 @@ levels(pelEp$tax.Species) <- c(unique(pelEp$tax.Species, 'unassigned' ))
 
 ggplot(pelEp %>% filter (uniqcode %in% nrs)) + 
    geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill') + 
-   scale_fill_manual(values=c(mycolsE, other), name='Phytoplankton Family and Species') +theme_bw() + theme(legend.position = 'bottom') + 
+   scale_fill_manual(values=c(mycolsE, other), name='Phytoplankton Family and Species') +theme_bw() + theme(legend.position = 'right') + 
    coord_flip() + 
-   facet_grid(sample_site ~ month,, space='free', as.table = T) + 
+   facet_grid(sample_site ~ ., space='free', as.table = T) + 
    labs(title=' Overview of Phytoplankton diversity from 18S amplicons. Month x depth at IMOS NRS sites')  + 
-   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.8,"cm")) + 
+   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.4,"cm")) + 
    scale_x_discrete(limits=rev(levels(pelEp$depth_f))) +
   scale_y_continuous(expand=c(0,0)) +
-   guides(fill=guide_legend( ncol=4)) 
+   guides(fill=guide_legend( ncol=2)) 
+
+phytocounts<-pelEp %>% group_by(tax.Order, tax.Genus,tax.Family,tax.Species) %>% distinct(tax.Order, tax.Genus,tax.Family,tax.Species)
+
+sum(phyto$abund)
+
+length(unique(pelE$code))
+
+
+write_csv('/Volumes/Dropbox/MarineMicrobes Dropbox/)
 
 ggsave('~/NRS_month_by_depth_Eukaryote_18s.pdf', height=12, width=18 )
+ggsave('~/NRS_by_depth_Eukaryote_18s.pdf', height=12, width=15 )
 
 ```
 
@@ -298,10 +323,11 @@ pelEd<- pelE %>%  filter(tax.Division == 'Dinoflagellata')
 
 levels(pelEd$tax.Species) <- c(unique(pelEd$tax.Species, 'unassigned' ))
 
- levels(pelEd$sample_site) <-c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")
+pelEd$sample_site <- factor(pelEd$sample_site, levels=rev(c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")))
+
  
  levels(pelEd$tax.Family) <- c(unique(pelEd$tax.Family, 'unassigned' ))
- pelEd <- pelEd %>% unite( 'FG', c(tax.Family,tax.Species), remove=F)
+ pelEd <- pelEd %>% unite('FG', c(tax.Family,tax.Species), remove=F)
  pelEd$depth_m[pelEd$depth_m==0]<-2
  pelEd$depth_f<- cut(pelEd$depth_m, c(0,14,40,80,120), labels=c("Surface",  "15 - 39m", "40 - 79m",  "80 - 119m"))
  #pelE$depth_b<- cut(pelE$bottom_depth, c(0,150, 10000), labels=c("Shelf - Coastal", "Offshore"))
@@ -316,6 +342,8 @@ levels(pelEd$tax.Species) <- c(unique(pelEd$tax.Species, 'unassigned' ))
  other<-'grey80'
  names(other)='Other'
 
+ 
+ 
 
 ggplot(pelEd %>% filter (uniqcode %in% nrs)) + 
    geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill') + 
@@ -328,8 +356,90 @@ ggplot(pelEd %>% filter (uniqcode %in% nrs)) +
   scale_y_continuous(expand=c(0,0)) +
    guides(fill=guide_legend( ncol=4)) 
 
+dinoocounts<-pelEd %>% group_by(tax.Order, tax.Genus,tax.Family,tax.Species) %>% distinct(tax.Order, tax.Genus,tax.Family,tax.Species)
+
 ggsave('~/NRS_month_by_depth_Dinoflagellate_18s.pdf', height=12, width=18 )
 ```
+
+
+```{r,fig.width=18, fig.height=10}
+
+pelEm<- pelE %>%  filter(tax.Division == 'Metazoa')
+
+levels(pelEm$tax.Species) <- c(unique(pelEm$tax.Species, 'unassigned' ))
+
+
+pelEm$sample_site <- factor(pelEm$sample_site, levels=rev(c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")))
+
+ levels(pelEm$sample_site) <-c("Maria Island","Kangaroo Island" , "Port Hacking" ,"Rottnest Island","North Stradbroke Island", "Channel", "Geoffrey Bay","Taren Point", "Pioneer Bay", "Balls Head","Lilli Pilli","Cobblers Beach","Centaur Reef","Cobbler Beach","Yongala" ,"Darwin" ,"Salmon Haul", "Lilli Pilli Pool","Bare Island", "Wreck Rock")
+ 
+ levels(pelEm$tax.Family) <- c(unique(pelEm$tax.Family, 'unassigned' ))
+ pelEm <- pelEm %>% unite( 'FG', c(tax.Family,tax.Species), remove=F)
+ pelEm$depth_m[pelEm$depth_m==0]<-2
+ pelEm$depth_f<- cut(pelEm$depth_m, c(0,14,40,80,120), labels=c("Surface",  "15 - 39m", "40 - 79m",  "80 - 119m"))
+ #pelE$depth_b<- cut(pelE$bottom_depth, c(0,150, 10000), labels=c("Shelf - Coastal", "Offshore"))
+ 
+ 
+ # creating a named vector of colors with the lumping factor as names (in this case tax.Family joined to tax.Species) will allow us to see the use the general patterns in diversity over an annual cycle at each IMOS NRS
+ 
+ mycolsEm <-rev(as.vector(mycol1000[seq(7,1000, 1000/84)])) 
+ pelEm$FG[pelEm$FG== 'NA_NA']<-NA
+ legend.namesEm <- pelEm %>% filter(FG %in% ( fct_lump(FG, 80, w=abund))) %>% select (FG, tax.Family) %>% distinct(FG, .keep_all=T)
+ names(mycolsEm) <-legend.namesEm$FG
+ other<-'grey80'
+ names(other)='Other'
+
+ 
+ 
+
+ggplot(pelEm %>% filter (uniqcode %in% nrs)) + 
+   geom_bar(aes(x=depth_f, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill') + 
+   scale_fill_manual(values=c(mycolsEm, other), name='Metazoa Family and Species') +theme_bw() + theme(legend.position = 'bottom') + 
+   coord_flip() + 
+   facet_grid(sample_site ~ month, space='free', as.table = T) + 
+   labs(title=' Overview of Metazoa diversity from 18S amplicons. Month x depth at IMOS NRS sites')  + 
+   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.8,"cm")) + 
+   scale_x_discrete(limits=rev(levels(pelEm$depth_f))) +
+  scale_y_continuous(expand=c(0,0)) +
+   guides(fill=guide_legend( ncol=4)) 
+
+metazoaocounts<-pelEm %>% group_by(tax.Order, tax.Genus,tax.Family,tax.Species) %>% distinct(tax.Order, tax.Genus,tax.Family,tax.Species)
+?facet_grid
+sum(pelEm$abund)
+
+ggsave('~/NRS_month_by_depth_Metazoan_18s.pdf', height=12, width=18 )
+```
+
+```{r, fig.width=12, fig.height=10}
+ggplot(pelEd %>% filter (year > 2014)) + 
+   geom_bar(aes(x=date_sampled, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill', width=6) + 
+   scale_fill_manual(values=c(mycolsEd, other), name='Dinoflagellate Family and Species') +theme_bw() + theme(legend.position = 'bottom') + 
+   labs(title=' Overview of Dinoflagellate diversity from 18S amplicons. Month x depth at IMOS NRS sites')  + 
+   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.4,"cm")) + 
+  facet_grid(sample_site ~ ., scales = 'free') + 
+   scale_x_discrete(limits=rev(levels(pelEd$depth_f))) +
+  scale_y_continuous(expand=c(0,0)) +
+   guides(fill=guide_legend( ncol=4)) 
+
+```
+
+
+
+```{r,fig.width=8, fig.height=12}
+ggplot(pelEp %>%  filter (year >2014, tax.Division=='Ochrophyta')) + 
+   geom_bar(aes(x=date_sampled, y=abund, fill=fct_lump(FG, 60, w=abund)), stat='identity', position='fill', width=6) + 
+   scale_fill_manual(values=c(mycolsE, other), name='Bacillariophyta Family and Species') +theme_bw() + theme(legend.position = 'bottom') + 
+   labs(title=' Overview of Ochrophyta diversity from 18S amplicons. Month x depth at IMOS NRS sites')  + 
+   theme( strip.text.y = element_text(angle = 0), panel.spacing.x = unit(0.01,"cm"), panel.spacing.y = unit(0.4,"cm")) + 
+  facet_grid(sample_site ~ ., scales = 'free') + 
+   scale_x_discrete(limits=rev(levels(pelEp$depth_f))) +
+  scale_y_continuous(expand=c(0,0)) +
+   guides(fill=guide_legend( ncol=4)) 
+
+ggsave ('~/Diatoms_all_MM_sites.pdf', height = 18, width=8)
+
+```
+
 
 ## CLUSTERING MOLECULAR DATA FROM NRS TIME SERIES ##
 # ======================================================================================
@@ -351,7 +461,7 @@ ggsave('~/NRS_month_by_depth_Dinoflagellate_18s.pdf', height=12, width=18 )
 # 
 #  source: https://data.bioplatforms.com/organization/australian-microbiome
 # ======================================================================================
-# Visualise Ordination and Clustering
+# Visualise, Ordination and Clustering
 
 *************************************************************************************
 
@@ -359,7 +469,7 @@ ggsave('~/NRS_month_by_depth_Dinoflagellate_18s.pdf', height=12, width=18 )
 
 not yet completed
 
-```{r}
+```
 
 clusters.df2<-readRDS('~/Dropbox/zOTUs/bioregions.1/nrs.1000simprof.rds')
 clusters.df2<-readRDS('~/Dropbox/zOTUs/bioregions.1/top.1000.mm.for.modelling.csv')

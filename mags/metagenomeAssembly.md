@@ -22,7 +22,12 @@ The general steps are as follows
 
 
 # -------------------------------------------------------
+
 Source data: downloaded from the [Australian Microbiome data portal](https://data.bioplatforms.com/organization/australian-microbiome)
+
+Tools: [Trimmomatic version ](https://github.com/timflutre/trimmomatic)
+[bbnorm](bbtools)
+[SPAdes  ](http://cab.spbu.ru/software/spades/)
 
 
 Working Directories:

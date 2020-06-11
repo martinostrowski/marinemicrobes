@@ -3,7 +3,7 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-# Authors: Martin Ostrowski, Caludia 
+# Authors: Martin Ostrowski, Claudia 
 ## Contact: martin.ostrowski@uts.edu.au
 
 ### Description

@@ -59,7 +59,7 @@ for i in *fasta; do  name=$(basename $i .norm.contigs.fasta); sed -i "s/NODE/"${
 
 ### BBnorm 
 
-```r
+```bash
 #!/bin/bash
 
 #PBS -N bbnorm
@@ -69,26 +69,21 @@ for i in *fasta; do  name=$(basename $i .norm.contigs.fasta); sed -i "s/NODE/"${
 
 
 cd /shared/c3/projects/ami_assembly_2020.martin/
-echo "Job ID is ${PBS_JOB_ID}"
-echo "Job Array ID is ${PBS_ARRAY_INDEX}"
-echo "Timestamp is $(date +%F_%T)"
 echo "Directory is $(pwd)"
 echo "Running on host $(hostname)"
 echo "Working directory is ${PBS_O_WORKDIR}"
-echo "Job has the following nodes/cores:"
 cat ${PBS_NODEFILE}
 
-#split the input fasta into many parts then distribute widely
 CODE=$(awk -v line=${PBS_ARRAY_INDEX} '{if (NR == line) { print $0; };}' /shared/c3/projects/ami_assembly_2020.martin/bbnorm.sort.conf)
 
 date +%F_%T
 #echo "file working on is $CODE"
 /shared/c3/projects/ami_assembly_2020.martin/bbmap/bbnorm.sh target=30 mindepth=2 in=/shared/c3/bio_db/BPA/metaG/fastq_trimmed/$CODE.R1.fastq.gz in2=/shared/c3/bio_db/BPA/metaG/fastq_trimmed/$CODE.R2.fastq.gz out=/shared/c3/projects/ami_assembly_2020.martin/$CODE.bbnorm.R1.fastq.gz out2=/shared/c3/projects/ami_assembly_2020.martin/$CODE.bbnorm.R2.fastq.gz thread$
-date +%F_%T
+
 ```
 ### Spades Assemblies
 
-```r
+```bash
 #!/bin/bash
 
 #PBS -N spades
@@ -100,26 +95,24 @@ date +%F_%T
 module load bio/SPAdes-3.14.1
 
 cd /shared/c3/projects/ami_assembly_2020.martin/
-echo "Job ID is ${PBS_JOB_ID}"
-echo "Job Array ID is ${PBS_ARRAY_INDEX}"
-echo "Timestamp is $(date +%F_%T)"
 echo "Directory is $(pwd)"
 echo "Running on host $(hostname)"
 echo "Working directory is ${PBS_O_WORKDIR}"
-echo "Job has the following nodes/cores:"
 cat ${PBS_NODEFILE}
 
-#split the input fasta into many parts then distribute widely
 CODE=$(awk -v line=${PBS_ARRAY_INDEX} '{if (NR == line) { print $0; };}' /shared/c3/projects/ami_assembly_2020.martin/runList3)
 
-#CODE=138100
 
 date +%F_%T
-#echo "file working on is $PARAMETERS"
 
 spades.py --tmp-dir /scratch/work/$CODE.spadestmp --meta --only-assembler -k 33,55,77 -m 240 -t 20 -1 /shared/c3/projects/ami_assembly_2020.martin/$CODE.bbnorm.R1.fastq.gz -2 /shared/c3/projects/ami_assembly_2020.martin/$CODE.bbnorm.R2.fastq.gz -o /shared/c3/projects/ami_assembly_2020.martin/$CODE.norm
 
 rm -r /scratch/work/$CODE.spadestmp
 
-date +%F_%T
+
 ```
+
+
+
+
+for i in *norm/contigs.fasta; do code=$(dirname $i); cp $i fasta.2k/$code.contigs.fasta; done

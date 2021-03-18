@@ -1,0 +1,74 @@
+---
+title: "Pairwise distance comparisons between samples"
+output: html_notebook
+---
+The notebook describes the average dissimilarity of pairwise sample comparisons binned by the time difference between samples (And analysed for each site separately)
+Authors: Nine Le Reun, Martin Ostrowski and Anna Bramucci
+
+
+```{r, fig.height=5, fig.width=3}
+nine <- read_csv('~/Downloads/bc_df_matrix_nine.csv') # this was a df with missing rownames
+
+nine$code <- colnames(nine) # but we know that the rownames are in the same order as the column 
+
+ninelonger <- nine %>%  pivot_longer(-code, names_to = 'code2', values_to = 'pwd') # pivot longer to get 3 columns
+
+
+#now we need to create a sequence of months from t=0 (2014 - 01 -01)
+#convert date to year and month columns
+#the input file for metadata is the current best effort (5131 samples)
+MMmetacmy <- MMmeta %>% select(code, utc_date_sampled_yyyymmdd) %>% mutate('year' =year(utc_date_sampled_yyyymmdd), 'month'=month(utc_date_sampled_yyyymmdd))
+
+# a bit of maths to create the sequence
+MMmetacmy$monthSeq <- MMmetacmy$month + ((MMmetacmy$year-2014)*12)
+#add the month sequence  for the 1st sample ('code')
+ninelonger <- ninelonger %>% left_join(MMmetacmy %>%  select(code, monthSeq))
+
+
+ninelonger <- ninelonger %>% left_join(MMmetacmy %>%  select(code, monthSeq) %>% rename(code2 = code, month2Seq =monthSeq))
+
+#calculate the month difference for binning (Anna ?)
+
+ninelonger$diff <- ninelonger$month2Seq - ninelonger$monthSeq
+
+#add uniqcode to help faceting
+ninelonger <- ninelonger %>% left_join(MMmeta %>% select(code, uniqcode))
+
+
+#But we can only compare samples within each site
+mmeta2  <- MMmeta %>% select(code, uniqcode) 
+  
+colnames(mmeta2) <- c('code2' , 'uniqcode2')
+
+ninelonger <- ninelonger %>% left_join(mmeta2)
+
+nineabitshorter <- ninelonger %>% filter (uniqcode == uniqcode2)
+
+
+#plot the summary statistics (Nine and Anna please check this)
+
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+
+df2 <- data_summary(nineabitshorter %>% filter (diff > 0), varname="pwd", 
+                    groupnames=c("diff", "uniqcode"))
+# Convert dose to a factor variable
+#df2$diff=as.factor(df2$diff)
+
+ggplot(df2, aes(x=diff, y=pwd, color=uniqcode)) + 
+  geom_line()+ 
+  geom_pointrange(aes(ymin=pwd-sd, ymax=pwd+sd)) + facet_grid(uniqcode ~., scales='free') + theme_bw()
+
+```
+
+
+
